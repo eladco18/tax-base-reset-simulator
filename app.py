@@ -56,29 +56,6 @@ def fetch_asset_data(ticker_symbol: str):
     except Exception:
         return 0.0, "ERROR", False
 
-'''
-def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
-    """Finds the USD/ILS exchange rate for a specific past date."""
-    if df_history.empty:
-        return fallback_rate
-
-    target_dt = pd.to_datetime(target_date)
-    # If exact date exists
-    if target_dt in df_history.index:
-        return float(df_history.loc[target_dt, 'Close'])
-
-    # If weekend/holiday, get the nearest prior date (pad method)
-    try:
-        idx = df_history.index.get_indexer([target_dt], method='pad')
-        if idx[0] != -1:
-            return float(df_history.iloc[idx[0]]['Close'])
-    except Exception:
-        pass
-
-    return fallback_rate
-'''
-
-
 def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
     """Finds the USD/ILS exchange rate for a specific past date, strictly handling timezones."""
     if df_history.empty:
