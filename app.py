@@ -56,7 +56,7 @@ def fetch_asset_data(ticker_symbol: str):
     except Exception:
         return 0.0, "ERROR", False
 
-
+'''
 def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
     """Finds the USD/ILS exchange rate for a specific past date."""
     if df_history.empty:
@@ -76,6 +76,39 @@ def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback
         pass
 
     return fallback_rate
+'''
+
+
+def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
+    """Finds the USD/ILS exchange rate for a specific past date, strictly handling timezones."""
+    if df_history.empty:
+        return fallback_rate
+
+    try:
+        # 1. Create a clean, timezone-naive copy of the historical index
+        df_clean = df_history.copy()
+        df_clean.index = pd.to_datetime(df_clean.index).tz_localize(None).normalize()
+
+        # 2. Clean the target date from the user
+        target_dt = pd.to_datetime(target_date).normalize()
+
+        # 3. Use 'asof' to find the exact date, or the closest PREVIOUS trading day (for weekends/holidays)
+        closest_date = df_clean.index.asof(target_dt)
+
+        if pd.isna(closest_date):
+            return fallback_rate  # Target date is older than available history
+
+        rate = df_clean.loc[closest_date, 'Close']
+
+        # 4. Handle edge cases where Yahoo might return duplicate rows for the same day
+        if isinstance(rate, pd.Series):
+            return float(rate.iloc[0])
+
+        return float(rate)
+
+    except Exception as e:
+        # We silently fall back, but safely
+        return fallback_rate
 
 # ==========================================
 # TAX ENGINE: SECTION 91(B) + THE MOSES FILTER
