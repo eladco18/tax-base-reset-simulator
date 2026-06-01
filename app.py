@@ -1,3 +1,5 @@
+from typing import re
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -133,11 +135,15 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
 st.sidebar.header("⚙️ Global Settings")
 ticker_input = st.sidebar.text_input("Asset Ticker (e.g., SPY, QQQ)", value="SPY").upper()
 
+if not re.match(r"^[A-Z0-9\-\.]+$", ticker_input):
+    st.sidebar.error("❌ Invalid input: Please enter a valid English ticker symbol (e.g., SPY, QQQ).")
+    st.stop()
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔮 Future Projections")
-expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_value=-100.0, max_value=100.0, value=8.0,
+expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_value=-100.0, max_value=100.0, value=0.0,
                                           step=0.5)
-investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=10)
+investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=0)
 
 with st.spinner("Initializing Market Data..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input)
@@ -194,13 +200,7 @@ else:
         st.write(
             f"Enter your transaction history for **{ticker_input}**. The system will calculate your current open lots using the **FIFO** method.")
 
-        default_ledger = pd.DataFrame({
-            "Date": [(datetime.today() - timedelta(days=730)).date(), (datetime.today() - timedelta(days=365)).date()],
-            "Action": ["Buy", "Sell"],
-            "Units": [15.0, 5.0],
-            "Price (USD)": [100.0, 120.0],
-            "USD/ILS Rate": [3.80, None]  # Second row empty to demonstrate auto-fill
-        })
+        default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Price (USD)", "USD/ILS Rate"])
 
         edited_df = st.data_editor(
             default_ledger,
