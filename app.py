@@ -1,11 +1,10 @@
-from typing import re
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
+import re
 
 # ==========================================
 # PAGE CONFIGURATION
