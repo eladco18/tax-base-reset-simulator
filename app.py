@@ -132,7 +132,7 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
 st.sidebar.header("⚙️ Global Settings")
-ticker_input = st.sidebar.text_input("Asset Ticker (e.g., SPY, QQQ)", value="").upper()
+ticker_input = st.sidebar.text_input("Asset Ticker (e.g., SPY, QQQ)", value="SPY").upper()
 
 if not re.match(r"^[A-Z0-9\-\.]+$", ticker_input):
     st.sidebar.error("❌ Invalid input: Please enter a valid English ticker symbol (e.g., SPY, QQQ).")
