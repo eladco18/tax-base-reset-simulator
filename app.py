@@ -1,10 +1,11 @@
-import streamlit as st
-import yfinance as yf
+import re
+from datetime import datetime, timedelta
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import numpy as np
-from datetime import datetime, timedelta
-import re
+import streamlit as st
+import yfinance as yf
+import requests
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -19,16 +20,32 @@ st.set_page_config(
 # ==========================================
 # DATA CACHING (YFINANCE)
 # ==========================================
+
+def get_yf_session():
+    """
+    Creates a disguised browser session to prevent Yahoo Finance from blocking cloud servers.
+    By default, yfinance requests might be blocked if they come from known cloud IPs (like Streamlit).
+    This injects a standard Google Chrome User-Agent header to bypass the block.
+    """
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    })
+    return session
+
+
 @st.cache_data(ttl=3600)
 def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
+    """Fetches historical USD/ILS exchange rates with fallback."""
     try:
-        ticker = yf.Ticker("ILS=X")
+        session = get_yf_session() # Injecting the anti-blocking session
+        ticker = yf.Ticker("ILS=X", session=session)
         df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'), auto_adjust=False)
         if df.empty:
-            df = yf.download("ILS=X", start=start_date, end=datetime.today().strftime('%Y-%m-%d'), progress=False)
+            df = yf.download("ILS=X", start=start_date, end=datetime.today().strftime('%Y-%m-%d'), progress=False, session=session)
         return df
     except Exception as e:
-        st.error(f"API Connection Error: {e}")
+        st.error(f"API Connection Error (Exchange Rates): {e}")
         return pd.DataFrame()
 
 
@@ -36,7 +53,8 @@ def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
 def fetch_asset_data(ticker_symbol: str):
     """Fetches the current price, currency, and dividend status of the specified asset."""
     try:
-        stock = yf.Ticker(ticker_symbol.upper())
+        session = get_yf_session() # Injecting the anti-blocking session
+        stock = yf.Ticker(ticker_symbol.upper(), session=session)
         hist = stock.history(period="1d")
         if hist.empty:
             return 0.0, "UNKNOWN", False
@@ -53,8 +71,11 @@ def fetch_asset_data(ticker_symbol: str):
                 pays_dividend = True
 
         return price, currency, pays_dividend
-    except Exception:
+    except Exception as e:
+        # Replaced the silent failure with an explicit error output for easier debugging
+        st.error(f"🚨 YFinance Diagnostic Error (Asset Data): {str(e)}")
         return 0.0, "ERROR", False
+
 
 def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
     """Finds the USD/ILS exchange rate for a specific past date, strictly handling timezones."""
@@ -152,7 +173,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🔮 Future Projections")
 expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_value=-100.0, max_value=100.0, value=0.0,
                                           step=0.5)
-investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=0)
+investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=5)
 
 with st.spinner("Initializing Market Data..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input)
@@ -397,13 +418,14 @@ else:
                 st.subheader("CFO Verdict ⚖️")
 
                 if total_tax_today == 0:
-                    # Check if resetting actually improves the future net value (The Holy Grail) or hurts it (Lowering Tax Base)
-                    if scenario_b_net[-1] > scenario_a_net[-1]:
-                        st.success(
-                            "**Optimal Condition (The Holy Grail):** Your current tax liability is ₪0 due to favorable exchange rate conditions, despite having unrealized USD profits! It is mathematically optimal to execute a Tax Base Reset today, raising your future tax shield at zero tax cost.")
-                    else:
-                        st.error(
-                            "**Warning (Value Destroyer):** Although your current tax liability is ₪0, executing a reset today would **lower** your original tax base. In the future, you will pay more tax on the growth than if you simply held. The 'HOLD' strategy is mathematically superior.")
+                    if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
+                        # Check if resetting actually improves the future net value (The Holy Grail) or hurts it (Lowering Tax Base)
+                        if scenario_b_net[-1] > scenario_a_net[-1]:
+                            st.success(
+                                "**Optimal Condition (The Holy Grail):** Your current tax liability is ₪0 due to favorable exchange rate conditions, despite having unrealized USD profits! It is mathematically optimal to execute a Tax Base Reset today, raising your future tax shield at zero tax cost.")
+                        else:
+                            st.error(
+                                "**Warning (Value Destroyer):** Although your current tax liability is ₪0, executing a reset today would **lower** your original tax base. In the future, you will pay more tax on the growth than if you simply held. The 'HOLD' strategy is mathematically superior.")
 
                 elif breakeven_year:
                     if breakeven_year == 1:
