@@ -40,7 +40,8 @@ def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
     try:
         session = get_yf_session() # Injecting the anti-blocking session
         ticker = yf.Ticker("ILS=X", session=session)
-        df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'), auto_adjust=False)
+        # df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'), auto_adjust=False)
+        df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'))
         if df.empty:
             df = yf.download("ILS=X", start=start_date, end=datetime.today().strftime('%Y-%m-%d'), progress=False, session=session)
         return df
