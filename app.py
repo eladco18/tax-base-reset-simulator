@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -36,44 +36,19 @@ def get_yf_session():
 
 @st.cache_data(ttl=3600)
 def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
-    """
-    Fetches historical USD/ILS exchange rates, ensuring today's rate is included.
-    Uses UTC-aware datetimes to avoid server/exchange timezone mismatches.
-    """
+    """Fetches historical USD/ILS exchange rates with fallback."""
     try:
-        session = get_yf_session()  # Injecting the anti-blocking session
+        session = get_yf_session() # Injecting the anti-blocking session
         ticker = yf.Ticker("ILS=X", session=session)
-        # Primary: omit 'end' so yfinance fetches up to the latest available bar
-        df = ticker.history(start=start_date, auto_adjust=True)
+        # df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'), auto_adjust=False)
+        df = ticker.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'))
         if df.empty:
-            # Fallback: push end date +2 days to safely clear the exclusive boundary
-            # regardless of timezone offset between server and Yahoo Finance
-            end_date = (datetime.now(timezone.utc) + timedelta(days=2)).strftime("%Y-%m-%d")
-            df = yf.download(
-                "ILS=X",
-                start=start_date,
-                end=end_date,
-                progress=False,
-                auto_adjust=True,
-                session=session,
-            )
-        if df.empty:
-            return pd.DataFrame()
-        # Normalize the index to UTC-aware timestamps, then strip any future-dated
-        # rows that a generous end_date might have introduced
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC")
-        else:
-            df.index = df.index.tz_convert("UTC")
-        now_utc = datetime.now(timezone.utc)
-        df = df[df.index <= now_utc]  # Drop any accidental future rows
-        # On weekdays before market open, the today-row may be partial/zero — drop it
-        if not df.empty and df["Close"].iloc[-1] == 0:
-            df = df.iloc[:-1]
+            df = yf.download("ILS=X", start=start_date, end=datetime.today().strftime('%Y-%m-%d'), progress=False, session=session)
         return df
     except Exception as e:
         st.error(f"API Connection Error (Exchange Rates): {e}")
         return pd.DataFrame()
+
 
 @st.cache_data(ttl=3600)
 def fetch_asset_data(ticker_symbol: str):
