@@ -1,11 +1,14 @@
 import re
+import time
 from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import yfinance as yf
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import yfinance as yf
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -21,17 +24,44 @@ st.set_page_config(
 # DATA CACHING (YFINANCE)
 # ==========================================
 
-def get_yf_session():
+def get_yf_session() -> requests.Session:
     """
-    Creates a disguised browser session to prevent Yahoo Finance from blocking cloud servers.
-    By default, yfinance requests might be blocked if they come from known cloud IPs (like Streamlit).
-    This injects a standard Google Chrome User-Agent header to bypass the block.
+    Hardened browser-impersonating session with transport-level retry for
+    TCP/connection errors.
     """
     session = requests.Session()
+
+    adapter = HTTPAdapter(
+        max_retries=Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["GET"],
+            raise_on_status=False,
+        )
+    )
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://finance.yahoo.com/",
+        "DNT": "1",
+        "Connection": "keep-alive",
     })
     return session
+
+
+def _is_rate_limit_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return any(token in msg for token in ("429", "rate limit", "too many requests"))
 
 
 @st.cache_data(ttl=3600)
@@ -75,32 +105,53 @@ def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
         st.error(f"API Connection Error (Exchange Rates): {e}")
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=3600)
 def fetch_asset_data(ticker_symbol: str):
-    """Fetches the current price, currency, and dividend status of the specified asset."""
-    try:
-        session = get_yf_session() # Injecting the anti-blocking session
-        stock = yf.Ticker(ticker_symbol.upper(), session=session)
-        hist = stock.history(period="1d")
-        if hist.empty:
-            return 0.0, "UNKNOWN", False
+    """
+    Fetches price, currency, and dividend status in the fewest possible
+    Yahoo Finance round-trips, with true exponential backoff on 429s.
+    """
+    max_retries = 3
+    base_sleep = 2
 
-        price = float(hist['Close'].iloc[-1])
-        currency = stock.info.get('currency', 'UNKNOWN').upper()
+    # Create session ONCE outside the loop
+    session = get_yf_session()
 
-        # Check if the asset pays dividends (Yield > 0 or recent dividend history)
-        div_yield = stock.info.get('dividendYield')
-        pays_dividend = True if (div_yield and div_yield > 0) else False
-        if not pays_dividend:
-            recent_divs = stock.dividends
-            if not recent_divs.empty and recent_divs.index[-1].year >= datetime.today().year - 1:
-                pays_dividend = True
+    for attempt in range(max_retries):
+        try:
+            stock = yf.Ticker(ticker_symbol.upper(), session=session)
 
-        return price, currency, pays_dividend
-    except Exception as e:
-        # Replaced the silent failure with an explicit error output for easier debugging
-        st.error(f"🚨 YFinance Diagnostic Error (Asset Data): {str(e)}")
-        return 0.0, "ERROR", False
+            # --- Round-trip 1: fast_info covers price + currency in one call ---
+            fi = stock.fast_info
+            price = float(fi.last_price)
+            currency = (fi.currency or "UNKNOWN").upper()
+
+            # --- Round-trip 2: dividends only ---
+            pays_dividend = False
+            try:
+                recent_divs = stock.dividends
+                if not recent_divs.empty:
+                    last_div_year = recent_divs.index[-1].year
+                    pays_dividend = last_div_year >= datetime.today().year - 1
+            except Exception:
+                pays_dividend = False
+
+            return price, currency, pays_dividend
+
+        except Exception as e:
+            if _is_rate_limit_error(e):
+                if attempt < max_retries - 1:
+                    sleep_time = base_sleep * (2 ** attempt)  # 2, 4, 8
+                    time.sleep(sleep_time)
+                    continue
+                st.error(
+                    f"🚨 Yahoo Finance is rate-limiting this server. "
+                    f"Data may be stale. Try refreshing in a few minutes."
+                )
+            else:
+                st.error(f"🚨 YFinance Error (attempt {attempt + 1}): {e}")
+            return 0.0, "ERROR", False
 
 
 def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
