@@ -11,7 +11,7 @@ import requests
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Tax Base Reset Simulator",
+    page_title="Tax Basis Step-Up Simulator",
     layout="wide",
     page_icon="📊"
 )
@@ -311,9 +311,9 @@ future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0,
 # ==========================================
 # MAIN DASHBOARD
 # ==========================================
-st.title("📊 Capital Gains Tax Simulator: Tax Base Reset")
+st.title("📊 Capital Gains Tax Simulator: Tax Basis Step-Up Strategy")
 st.markdown(
-    "Evaluate the financial viability of a **Tax Base Reset** strategy under Section 91(b) of the Israeli Income Tax Ordinance.")
+    "Evaluate the financial viability of a **Tax Basis Step-Up** strategy under Section 91(b) of the Israeli Income Tax Ordinance.")
 
 # --- PDF DOWNLOAD BUTTON ---
 try:
@@ -323,7 +323,7 @@ try:
     st.download_button(
         label="📄 Download the Complete Strategy Guide (PDF)",
         data=pdf_bytes,
-        file_name="Tax_Base_Reset_Guide.pdf",
+        file_name="Tax_Base_Step-Up_Guide.pdf",
         mime="application/pdf",
         help="It is highly recommended to read this comprehensive guide before making any decisions or executing trades in your brokerage account."
     )
@@ -356,7 +356,7 @@ if not df_ils.empty:
     fig1.add_hline(y=0, line_width=1.5, line_color="black", line_dash="dash")
 
     # Static title, completely detached from the asset and its price
-    chart_title = f"Tax Base Reset Potential (Current Rate: {current_rate:.4f} ILS)"
+    chart_title = f"Tax Base Step-Up Potential (Current Rate: {current_rate:.4f} ILS)"
 
     fig1.update_layout(
         title=chart_title,
@@ -551,7 +551,7 @@ fig2.add_trace(go.Scatter(
     x=years,
     y=scenario_b_net,
     mode='lines',
-    name='Tax Base Reset',
+    name='Tax Base Step-Up',
     line=dict(color='#c0392b', width=3),
     hovertemplate="Net Portfolio Value: %{y:,.2f} ILS<extra></extra>"
 ))
@@ -602,7 +602,7 @@ elif breakeven_year:
 
 else:
     st.success(
-        f"**Strategy Validated:** Within your {investment_horizon}-year horizon, the Tax Base Reset remains highly profitable. The tax savings outweigh the lost compound interest for the entire projected period.")
+        f"**Strategy Validated:** Within your {investment_horizon}-year horizon, the Tax Base Step-Up remains highly profitable. The tax savings outweigh the lost compound interest for the entire projected period.")
 
 # Actionable Disclaimer Box
 disclaimer_items = [
