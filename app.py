@@ -281,8 +281,9 @@ if not re.match(r"^[A-Z0-9\-\.]+$", ticker_input):
     st.sidebar.error("❌ Invalid input: Please enter a valid English ticker symbol (e.g., SPY, QQQ).")
     st.stop()
 
-st.markdown("### 💸 Friction Costs")
-transaction_costs_usd = st.number_input(
+st.sidebar.markdown("---")
+st.sidebar.subheader("💸 Friction Costs")
+transaction_costs_usd = st.sidebar.number_input(
     "Buy & Sell Commissions (USD)",
     min_value=0.0,
     value=0.0,
@@ -337,10 +338,8 @@ if not df_ils.empty:
     ))
     fig1.add_hline(y=0, line_width=1.5, line_color="black", line_dash="dash")
 
-    # Dynamic title based on whether a valid asset price exists
+    # Static title, completely detached from the asset and its price
     chart_title = f"Tax Base Reset Potential (Current Rate: {current_rate:.4f} ILS)"
-    if current_price > 0:
-        chart_title += f" | {ticker_input}: ${current_price:.2f}"
 
     fig1.update_layout(
         title=chart_title,
@@ -350,17 +349,6 @@ if not df_ils.empty:
     st.plotly_chart(fig1, use_container_width=True)
 else:
     st.warning("Historical exchange rate data is currently unavailable.")
-
-# --- CURRENCY VALIDATION WALL ---
-# We use st.stop() to halt rendering if the asset is not valid, keeping the rest of the code flat and clean.
-if asset_currency not in ["USD", "UNKNOWN", "ERROR"]:
-    st.error(
-        f"### 🛑 Currency Mismatch Detected\nThe security **{ticker_input}** you entered is traded in **{asset_currency}**. \n\nFor the Section 91(b) 'Tax Base Reset' strategy to mathematically apply, the asset must be denominated in **USD**. Please enter a valid US-traded ticker in the sidebar to continue.")
-    st.stop()
-
-elif current_price <= 0:
-    st.warning("Awaiting valid asset data. Please enter a valid US ticker in the sidebar to load the ledger.")
-    st.stop()
 
 # ==========================================
 # IF WE PASSED THE WALL, CONTINUE RENDERING
