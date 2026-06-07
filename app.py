@@ -358,9 +358,9 @@ st.write(f"Enter your transaction history for **{ticker_input}**. The system wil
 
 # --- NEW: Contextual Market Snapshot ---
 st.info(
-    f"📌 **Live Market Reference:** "
-    f"**{ticker_input}** Price: `${current_price:,.2f}` &nbsp;|&nbsp; "
-    f"**USD/ILS** Rate: `₪{current_rate:,.4f}`"
+    f"📌 **Asset:** **{ticker_input}** &nbsp;|&nbsp; "
+    f"**Price:** **${current_price:,.2f}** &nbsp;|&nbsp; "
+    f"**USD/ILS Rate:** **₪{current_rate:,.4f}**"
 )
 
 default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Price (USD)", "USD/ILS Rate"])
