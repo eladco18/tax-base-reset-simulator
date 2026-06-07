@@ -274,6 +274,10 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
 # ==========================================
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
+default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%Y-%m-%d')
+df_ils_init = fetch_historical_exchange_rates(default_start)
+current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
+
 st.sidebar.header("⚙️ Global Settings")
 ticker_input = st.sidebar.text_input("Asset Ticker (e.g., SPY, QQQ)", value="SPY").upper()
 
@@ -298,10 +302,6 @@ expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_valu
 investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=10)
 
 with st.spinner("Initializing Market Data..."):
-    default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%Y-%m-%d')
-    df_ils_init = fetch_historical_exchange_rates(default_start)
-    current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
-
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input)
 
 future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0, max_value=10.0,
