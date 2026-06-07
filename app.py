@@ -350,18 +350,20 @@ if not df_ils.empty:
 else:
     st.warning("Historical exchange rate data is currently unavailable.")
 
-# ==========================================
-# IF WE PASSED THE WALL, CONTINUE RENDERING
-# ==========================================
-
+# --- MODULE 2: THE FULL LEDGER ---
 # --- MODULE 2: THE FULL LEDGER ---
 st.markdown("---")
 st.header("2. The Ledger: Historical Transactions")
-st.write(
-    f"Enter your transaction history for **{ticker_input}**. The system will calculate your current open lots using the **FIFO** method.")
+st.write(f"Enter your transaction history for **{ticker_input}**. The system will calculate your current open lots using the **FIFO** method.")
+
+# --- NEW: Contextual Market Snapshot ---
+st.info(
+    f"📌 **Live Market Reference:** "
+    f"**{ticker_input}** Price: `${current_price:,.2f}` &nbsp;|&nbsp; "
+    f"**USD/ILS** Rate: `₪{current_rate:,.4f}`"
+)
 
 default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Price (USD)", "USD/ILS Rate"])
-
 edited_df = st.data_editor(
     default_ledger,
     num_rows="dynamic",
