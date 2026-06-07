@@ -6,9 +6,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-import yfinance as yf
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -21,16 +18,18 @@ st.set_page_config(
 
 
 # ==========================================
-# DATA CACHING (YFINANCE)
+# DATA CACHING (BOI & FINNHUB/TIINGO)
 # ==========================================
 
-def get_yf_session() -> requests.Session:
+def _get_api_session() -> requests.Session:
     """
-    Hardened browser-impersonating session with transport-level retry for
-    TCP/connection errors.
+    Creates a resilient HTTP session with transport-level retries for server errors.
     """
     session = requests.Session()
+    session.headers.update({"Accept": "application/json"})
 
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
     adapter = HTTPAdapter(
         max_retries=Retry(
             total=3,
@@ -41,117 +40,152 @@ def get_yf_session() -> requests.Session:
         )
     )
     session.mount("https://", adapter)
-    session.mount("http://", adapter)
-
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://finance.yahoo.com/",
-        "DNT": "1",
-        "Connection": "keep-alive",
-    })
     return session
 
 
-def _is_rate_limit_error(e: Exception) -> bool:
-    msg = str(e).lower()
-    return any(token in msg for token in ("429", "rate limit", "too many requests"))
+_SESSION = _get_api_session()
+
+# --- 1. BOI Exchange Rates ---
+_BOI_SERIES_URL = (
+    "https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/"
+    "dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS"
+    "?startperiod={start}&endperiod={end}&format=sdmx-json&lang=en"
+)
+
+
+def _parse_boi_response(data: dict) -> pd.DataFrame:
+    """Parses BOI SDMX-JSON into a timezone-naive DataFrame."""
+    try:
+        series_data = data["data"]["dataSets"][0]["series"]
+        series_key = next(iter(series_data))
+        observations = series_data[series_key]["observations"]
+        dim_values = data["data"]["structure"]["dimensions"]["observation"][0]["values"]
+
+        records = {}
+        for idx_str, obs_list in observations.items():
+            rate = obs_list[0]
+            if rate is not None:
+                date_str = dim_values[int(idx_str)]["id"]
+                records[date_str] = float(rate)
+
+        if not records:
+            return pd.DataFrame()
+
+        df = pd.DataFrame.from_dict(records, orient="index", columns=["Close"])
+        df.index = pd.to_datetime(df.index)
+        df.index.name = "Date"
+        df.sort_index(inplace=True)
+        return df
+    except Exception as exc:
+        raise ValueError(f"Unexpected BOI format: {exc}") from exc
 
 
 @st.cache_data(ttl=3600)
 def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
-    """
-    Fetches historical USD/ILS exchange rates, ensuring today's rate is included.
-    Uses UTC-aware datetimes to avoid server/exchange timezone mismatches.
-    """
+    """Fetches historical USD/ILS rates from the Bank of Israel."""
+    end_date = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+    url = _BOI_SERIES_URL.format(start=start_date, end=end_date)
+
     try:
-        session = get_yf_session()  # Injecting the anti-blocking session
-        ticker = yf.Ticker("ILS=X", session=session)
-        # Primary: omit 'end' so yfinance fetches up to the latest available bar
-        df = ticker.history(start=start_date, auto_adjust=True)
-        if df.empty:
-            # Fallback: push end date +2 days to safely clear the exclusive boundary
-            # regardless of timezone offset between server and Yahoo Finance
-            end_date = (datetime.now(timezone.utc) + timedelta(days=2)).strftime("%Y-%m-%d")
-            df = yf.download(
-                "ILS=X",
-                start=start_date,
-                end=end_date,
-                progress=False,
-                auto_adjust=True,
-                session=session,
-            )
-        if df.empty:
+        resp = _SESSION.get(url, timeout=15)
+        if resp.status_code == 429:
+            st.error("⚠️ BOI API rate limit reached.")
             return pd.DataFrame()
-        # Normalize the index to UTC-aware timestamps, then strip any future-dated
-        # rows that a generous end_date might have introduced
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC")
-        else:
-            df.index = df.index.tz_convert("UTC")
-        now_utc = datetime.now(timezone.utc)
-        df = df[df.index <= now_utc]  # Drop any accidental future rows
-        # On weekdays before market open, the today-row may be partial/zero — drop it
-        if not df.empty and df["Close"].iloc[-1] == 0:
-            df = df.iloc[:-1]
-        return df
-    except Exception as e:
-        st.error(f"API Connection Error (Exchange Rates): {e}")
+        if resp.status_code != 200:
+            st.error(f"⚠️ BOI API error ({resp.status_code}).")
+            return pd.DataFrame()
+
+        return _parse_boi_response(resp.json())
+
+    except Exception as exc:
+        st.error(f"⚠️ BOI Error: {exc}")
         return pd.DataFrame()
+
+
+# --- 2. Asset Data (Finnhub / Tiingo) ---
+_FINNHUB_QUOTE_URL = "https://finnhub.io/api/v1/quote"
+_FINNHUB_PROFILE_URL = "https://finnhub.io/api/v1/stock/profile2"
+_FINNHUB_DIVS_URL = "https://finnhub.io/api/v1/stock/dividend2"
+
+_TIINGO_QUOTE_URL = "https://api.tiingo.com/iex/{symbol}"
+_TIINGO_META_URL = "https://api.tiingo.com/tiingo/daily/{symbol}"
+
+
+def _finnhub_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
+    """Fetches price, currency, and dividend status from Finnhub."""
+    params = {"token": key, "symbol": symbol}
+
+    # 1. Price
+    q_resp = _SESSION.get(_FINNHUB_QUOTE_URL, params=params, timeout=10)
+    q_resp.raise_for_status()
+    price = float(q_resp.json().get("c", 0.0) or q_resp.json().get("pc", 0.0))
+    if price == 0.0:
+        raise ValueError("Zero price returned.")
+
+    # 2. Currency
+    p_resp = _SESSION.get(_FINNHUB_PROFILE_URL, params=params, timeout=10)
+    p_resp.raise_for_status()
+    currency = (p_resp.json().get("currency") or "USD").upper()
+
+    # 3. Dividends (Best effort)
+    pays_div = False
+    try:
+        d_resp = _SESSION.get(_FINNHUB_DIVS_URL, params=params, timeout=10)
+        if d_resp.status_code == 200:
+            pays_div = any(d.get("amount", 0) > 0 and d.get("year", 0) >= datetime.today().year - 1
+                           for d in (d_resp.json() or []))
+    except Exception:
+        pass
+
+    return price, currency, pays_div
+
+
+def _tiingo_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
+    """Fetches fallback data from Tiingo."""
+    headers = {"Authorization": f"Token {key}"}
+
+    # 1. Price
+    q_resp = _SESSION.get(_TIINGO_QUOTE_URL.format(symbol=symbol), headers=headers, timeout=10)
+    q_resp.raise_for_status()
+    data = q_resp.json()
+    if not data: raise ValueError("Empty quote.")
+    price = float(data[0].get("last") or data[0].get("tngoLast") or 0.0)
+
+    # 2. Currency
+    m_resp = _SESSION.get(_TIINGO_META_URL.format(symbol=symbol), headers=headers, timeout=10)
+    m_resp.raise_for_status()
+    currency = (m_resp.json().get("currency") or "USD").upper()
+
+    return price, currency, False
 
 
 @st.cache_data(ttl=3600)
 def fetch_asset_data(ticker_symbol: str):
     """
-    Fetches price, currency, and dividend status in the fewest possible
-    Yahoo Finance round-trips, with true exponential backoff on 429s.
+    Fetches real-time asset data using Finnhub (primary) and Tiingo (fallback).
+    Requires secrets configured in .streamlit/secrets.toml.
     """
-    max_retries = 3
-    base_sleep = 2
+    symbol = ticker_symbol.strip().upper()
+    fh_key = st.secrets.get("FINNHUB_API_KEY", "")
+    tg_key = st.secrets.get("TIINGO_API_KEY", "")
 
-    # Create session ONCE outside the loop
-    session = get_yf_session()
+    if not fh_key and not tg_key:
+        st.error("🚨 Missing API Keys in secrets.")
+        return 0.0, "ERROR", False
 
-    for attempt in range(max_retries):
+    if fh_key:
         try:
-            stock = yf.Ticker(ticker_symbol.upper(), session=session)
-
-            # --- Round-trip 1: fast_info covers price + currency in one call ---
-            fi = stock.fast_info
-            price = float(fi.last_price)
-            currency = (fi.currency or "UNKNOWN").upper()
-
-            # --- Round-trip 2: dividends only ---
-            pays_dividend = False
-            try:
-                recent_divs = stock.dividends
-                if not recent_divs.empty:
-                    last_div_year = recent_divs.index[-1].year
-                    pays_dividend = last_div_year >= datetime.today().year - 1
-            except Exception:
-                pays_dividend = False
-
-            return price, currency, pays_dividend
-
+            return _finnhub_fetch(symbol, fh_key)
         except Exception as e:
-            if _is_rate_limit_error(e):
-                if attempt < max_retries - 1:
-                    sleep_time = base_sleep * (2 ** attempt)  # 2, 4, 8
-                    time.sleep(sleep_time)
-                    continue
-                st.error(
-                    f"🚨 Yahoo Finance is rate-limiting this server. "
-                    f"Data may be stale. Try refreshing in a few minutes."
-                )
-            else:
-                st.error(f"🚨 YFinance Error (attempt {attempt + 1}): {e}")
-            return 0.0, "ERROR", False
+            st.warning(f"⚠️ Finnhub error: {e}. Trying fallback...")
+
+    if tg_key:
+        try:
+            return _tiingo_fetch(symbol, tg_key)
+        except Exception as e:
+            st.error(f"🚨 Tiingo error: {e}")
+
+    return 0.0, "ERROR", False
 
 
 def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
