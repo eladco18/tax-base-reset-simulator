@@ -293,9 +293,9 @@ transaction_costs_usd = st.sidebar.number_input(
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔮 Future Projections")
-expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_value=-100.0, max_value=100.0, value=0.0,
+expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_value=-100.0, max_value=100.0, value=5.0,
                                           step=0.5)
-investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=5)
+investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=10)
 
 with st.spinner("Initializing Market Data..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input)
@@ -313,6 +313,22 @@ future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0,
 st.title("📊 Capital Gains Tax Simulator: Tax Base Reset")
 st.markdown(
     "Evaluate the financial viability of a **Tax Base Reset** strategy under Section 91(b) of the Israeli Income Tax Ordinance.")
+
+# --- PDF DOWNLOAD BUTTON ---
+try:
+    with open("Guide.pdf", "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+
+    st.download_button(
+        label="📄 Download the Complete Strategy Guide (PDF)",
+        data=pdf_bytes,
+        file_name="Tax_Base_Reset_Guide.pdf",
+        mime="application/pdf",
+        help="It is highly recommended to read this comprehensive guide before making any decisions or executing trades in your brokerage account."
+    )
+except FileNotFoundError:
+    # If the file is missing, we silently pass or display a placeholder
+    pass
 
 # --- MODULE 1: MACRO VIEW (NOW INDEPENDENT) ---
 st.header("1. Macro View: Historical Tax Shield Potential")
@@ -347,10 +363,11 @@ if not df_ils.empty:
         template="plotly_white", hovermode="x unified", margin=dict(l=0, r=0, t=40, b=0)
     )
     st.plotly_chart(fig1, use_container_width=True)
+    st.caption(
+        "* **Note on Exchange Rates:** The system fetches the official Representative Rate (שער יציג) from the Bank of Israel. This rate is published once a day (Mon-Fri) around 15:30 Israel time. Therefore, during morning hours or weekends, the rate reflects the last published business day. For Israeli tax purposes, capital gains are legally calculated using this official daily rate, not live continuous Forex rates.")
 else:
     st.warning("Historical exchange rate data is currently unavailable.")
 
-# --- MODULE 2: THE FULL LEDGER ---
 # --- MODULE 2: THE FULL LEDGER ---
 st.markdown("---")
 st.header("2. The Ledger: Historical Transactions")
@@ -589,15 +606,18 @@ else:
 # Actionable Disclaimer Box
 disclaimer_items = [
     "💡 <b>נקודות קריטיות לתשומת לב לקראת ביצוע:</b> הסימולציה מציגה את השפעת מס רווח ההון על הקרן בלבד. ביצוע \"ניקוי שולחן\" בפועל דורש שתי פעולות רצופות, ולכן חובה לוודא מול הברוקר:",
-    "<b>1. עמלות מינימום:</b> קח בחשבון עמלות קנייה ומכירה. בתיקים קטנים, עמלות המינימום (לרוב כ-15$-20$ לפעולה הכפולה) עלולות למחוק את רוב או כל חיסכון המס.",
+    "<b>1. עמלות מינימום:</b> קח בחשבון עמלות קנייה ומכירה. בתיקים קטנים, עמלות המינימום עלולות למחוק את רוב או כל חיסכון המס. אנא ודא כי הזנת את העלות המשוערת של עמלות אלו בשדה המיועד לכך בתפריט הסימולטור (Friction Costs) כדי לקבל תוצאה מדויקת.",
     "<b>2. סכנת המרה כפולה:</b> ודא שתמורת המכירה נכנסת לחשבון המט\"ח (USD) ו<b>שלא</b> מתבצעת המרה אוטומטית לשקלים, כדי למנוע עמלות חליפין ופערי שער (Spread) מיותרים.",
-    "<b>3. סכנת \"עסקה מלאכותית\" (סעיף 86 לפקודה):</b> מכירה וקנייה מיידית של <i>אותו נייר ערך בדיוק</i> עלולה להיות מסווגת על ידי מס הכנסה כעסקה מלאכותית (Wash Sale), מה שעשוי לאיין את ההכרה באירוע המס (מאפשר לפקיד השומה להתעלם מפעולה פיננסית אם הוא קובע שהפעולה נעשתה אך ורק כדי להימנע מתשלום מס, ואין מאחוריה שום היגיון כלכלי או מסחרי אמיתי). כדי להתמודד עם סוגיה זו ולשמור על החשיפה לשוק, משקיעים רבים בוחרים לבצע את הרכישה החוזרת בקרן מחקה עוקבת של יצרן אחר (למשל, מכירת קרן SPY ורכישת קרן VOO או IVV באותו רגע)."
+    "<b>3. פערי ציטוט בשוק (Bid-Ask Spread):</b> מעבר לעמלות הקנייה והמכירה של הברוקר, פעולה מהירה בשוק ההון כרוכה בעלות חיכוך מובנית. בעת פעולת ה\"איפוס\", אתה תיאלץ למכור את הנכס במחיר הקונה (Bid) הנמוך מעט, ומיד לקנות אותו במחיר המוכר (Ask) הגבוה מעט. בניירות ערך חסרי נזילות (סחירות נמוכה), פער זה מתרחב ועלול למחוק חלק מחיסכון המס.",
+    "<b>4. סכנת \"עסקה מלאכותית\" (סעיף 86 לפקודה):</b> מכירה וקנייה מיידית של <i>אותו נייר ערך בדיוק</i> עלולה להיות מסווגת על ידי מס הכנסה כעסקה מלאכותית (Wash Sale), מה שעשוי לאיין את ההכרה באירוע המס. כדי להתמודד עם סוגיה זו ולשמור על החשיפה לשוק, משקיעים רבים בוחרים לבצע את הרכישה החוזרת בקרן מחקה עוקבת של יצרן אחר (למשל, מכירת קרן SPY ורכישת קרן VOO או IVV באותו רגע), או לחלופין, להמתין מספר ימי מסחר לפני הרכישה החוזרת.",
+    "<b>5. מגבלות בחירת שכבות מס (סכנת ה\"זיהוי הספציפי\"):</b> הסימולטור מניח מימוש בשיטת FIFO (נכנס ראשון, יוצא ראשון), שהיא ברירת המחדל החוקית בישראל. אם אתה סוחר דרך בנק או בית השקעות ישראלי, שיטה זו נכפית עליך אוטומטית במערכת. אם אתה סוחר דרך ברוקר זר ומתכנן למכור שכבה ספציפית (Specific Identification) כדי לייעל את המס, שים לב כי הסימולטור אינו תומך בתרחיש זה ומנוע המס שלו מבוסס בלעדית על אלגוריתם ה-FIFO.",
+    "<b>6. אשליית קיזוז הפסדים (הלכת מוזס):</b> אם הנכס נמצא בהפסד שקלי ואתה שוקל למכור אותו רק כדי לקזז רווחים מניירות ערך אחרים, שים לב: \"הלכת מוזס\" קובעת כי הפסד הון הנובע <i>אך ורק</i> משחיקת שער המטבע אינו מוכר כהפסד הון בר-קיזוז לצורכי מס. הפעולה במקרה זה עלולה \"להשמיד ערך\" ולהוריד את בסיס המס ההיסטורי שלך מבלי להעניק לך מגן מס אמיתי בהווה."
 ]
 
 # Append the dividend warning ONLY if the asset pays dividends
 if pays_dividend:
     disclaimer_items.append(
-        "<b>4. מס דיבידנדים (Tax Drag):</b> המערכת זיהתה שנכס הבסיס שבחרת מחלק דיבידנדים. חשוב לדעת שחישוב הריבית דריבית העתידי (התשואה שהזנת) לא מנכה את המס שנגבה במקור בעת חלוקת הדיבידנד (לרוב 25%). במציאות, גביית המס השוטפת תקטין במעט את קצב הצמיחה האמיתי של התיק."
+        "<b>7. מס דיבידנדים (Tax Drag):</b> המערכת זיהתה שנכס הבסיס שבחרת מחלק דיבידנדים. חשוב לדעת שחישוב הריבית דריבית העתידי (התשואה שהזנת) לא מנכה את המס שנגבה במקור בעת חלוקת הדיבידנד (לרוב 25%). במציאות, גביית המס השוטפת תקטין במעט את קצב הצמיחה האמיתי של התיק."
     )
 
 # Construct the HTML strictly without any code-level indentation leaks
