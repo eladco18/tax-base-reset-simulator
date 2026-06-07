@@ -457,7 +457,7 @@ col3.metric("Total Current Value (ILS)", f"₪{total_ils_value:,.2f}")
 
 st.info(
     "💡 **Best Practice:** Verify that the 'Current Open Shares' matches the exact balance in your brokerage account.")
-sanity_verified = st.checkbox("✅ I confirm that this accurately reflects my current portfolio.")
+sanity_verified = st.checkbox("I confirm that this accurately reflects my current portfolio.")
 
 if not sanity_verified:
     st.warning(
@@ -606,6 +606,7 @@ else:
 
 # Actionable Disclaimer Box
 disclaimer_items = [
+    "⚠️ <b>הבהרה משפטית:</b> תוצאות הסימולציה מבוססות על מודל מתמטי והערכות עתידיות. המערכת נועדה למטרות מחקר, לימוד והדגמה בלבד, ואינה מהווה ייעוץ מס פרטני, ייעוץ פיננסי, או המלצה לביצוע פעולות בשוק ההון. חובה להתייעץ עם רואה חשבון או יועץ מס מוסמך טרם קבלת החלטות פיננסיות.",
     "💡 <b>נקודות קריטיות לתשומת לב לקראת ביצוע:</b> הסימולציה מציגה את השפעת מס רווח ההון על הקרן בלבד. ביצוע \"העלאת מס בסיס\" בפועל דורש שתי פעולות רצופות, ולכן חובה לוודא מול הברוקר:",
     "<b>1. עמלות מינימום:</b> קח בחשבון עמלות קנייה ומכירה. בתיקים קטנים, עמלות המינימום עלולות למחוק את רוב או כל חיסכון המס. אנא ודא כי הזנת את העלות המשוערת של עמלות אלו בשדה המיועד לכך בתפריט הסימולטור (Friction Costs) כדי לקבל תוצאה מדויקת.",
     "<b>2. סכנת המרה כפולה:</b> ודא שתמורת המכירה נכנסת לחשבון המט\"ח (USD) ו<b>שלא</b> מתבצעת המרה אוטומטית לשקלים, כדי למנוע עמלות חליפין ופערי שער (Spread) מיותרים.",
