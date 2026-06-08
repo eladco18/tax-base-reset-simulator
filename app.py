@@ -375,7 +375,13 @@ edited_df = st.data_editor(
 )
 
 edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Price (USD)"]).reset_index(drop=True)
-st.caption("💡 **הערה חשובה:** בטבלה זו יש להזין תחת 'Buy Commission' רק עמלות של עסקאות **קנייה**. עמלות מכירה היסטוריות אינן משפיעות על בסיס המס של הפוזיציות שנותרו לכם כיום, ולכן המערכת מתעלמת מהן.")
+# UI: Forced RTL rendering using HTML div for mixed Hebrew/English string
+rtl_caption = '''
+<div dir="rtl" style="font-size: 0.85em; color: #6c757d; margin-top: -10px; margin-bottom: 10px;">
+💡 <b>הערה חשובה:</b> בטבלה זו יש להזין תחת 'Buy Commission' רק עמלות של עסקאות קנייה. עמלות מכירה היסטוריות אינן משפיעות על בסיס המס של הפוזיציות שנותרו לכם כיום, ולכן המערכת מתעלמת מהן.
+</div>
+'''
+st.markdown(rtl_caption, unsafe_allow_html=True)
 edited_df['Action_Rank'] = edited_df['Action'].map({'Buy': 1, 'Sell': 2})
 edited_df = edited_df.sort_values(by=["Date", "Action_Rank"]).reset_index(drop=True)
 
