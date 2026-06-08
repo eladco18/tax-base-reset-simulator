@@ -375,6 +375,7 @@ edited_df = st.data_editor(
 )
 
 edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Price (USD)"]).reset_index(drop=True)
+st.caption("💡 **הערה חשובה:** בטבלה זו יש להזין תחת 'Buy Commission' רק עמלות של עסקאות **קנייה**. עמלות מכירה היסטוריות אינן משפיעות על בסיס המס של הפוזיציות שנותרו לכם כיום, ולכן המערכת מתעלמת מהן.")
 edited_df['Action_Rank'] = edited_df['Action'].map({'Buy': 1, 'Sell': 2})
 edited_df = edited_df.sort_values(by=["Date", "Action_Rank"]).reset_index(drop=True)
 
