@@ -5,7 +5,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import requests
+
+# Import custom modules (Architecture Split)
+from market_data import fetch_historical_exchange_rates, fetch_asset_data, get_historical_rate_for_date
+from tax_engine import calculate_portfolio_tax
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -15,265 +18,6 @@ st.set_page_config(
     layout="wide",
     page_icon="📊"
 )
-
-
-# ==========================================
-# DATA CACHING (BOI & FINNHUB/TIINGO)
-# ==========================================
-
-def _get_api_session() -> requests.Session:
-    """
-    Creates a resilient HTTP session with transport-level retries for server errors.
-    """
-    session = requests.Session()
-    session.headers.update({"Accept": "application/json"})
-
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
-    adapter = HTTPAdapter(
-        max_retries=Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["GET"],
-            raise_on_status=False,
-        )
-    )
-    session.mount("https://", adapter)
-    return session
-
-
-_SESSION = _get_api_session()
-
-# --- 1. BOI Exchange Rates ---
-_BOI_SERIES_URL = (
-    "https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/"
-    "dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS"
-    "?startperiod={start}&endperiod={end}&format=sdmx-json&lang=en"
-)
-
-
-def _parse_boi_response(data: dict) -> pd.DataFrame:
-    """Parses BOI SDMX-JSON into a timezone-naive DataFrame."""
-    try:
-        series_data = data["data"]["dataSets"][0]["series"]
-        series_key = next(iter(series_data))
-        observations = series_data[series_key]["observations"]
-        dim_values = data["data"]["structure"]["dimensions"]["observation"][0]["values"]
-
-        records = {}
-        for idx_str, obs_list in observations.items():
-            rate = obs_list[0]
-            if rate is not None:
-                date_str = dim_values[int(idx_str)]["id"]
-                records[date_str] = float(rate)
-
-        if not records:
-            return pd.DataFrame()
-
-        df = pd.DataFrame.from_dict(records, orient="index", columns=["Close"])
-        df.index = pd.to_datetime(df.index)
-        df.index.name = "Date"
-        df.sort_index(inplace=True)
-        return df
-    except Exception as exc:
-        raise ValueError(f"Unexpected BOI format: {exc}") from exc
-
-
-@st.cache_data(ttl=3600)
-def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
-    """Fetches historical USD/ILS rates from the Bank of Israel."""
-    end_date = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
-    url = _BOI_SERIES_URL.format(start=start_date, end=end_date)
-
-    try:
-        resp = _SESSION.get(url, timeout=15)
-        if resp.status_code == 429:
-            st.error("⚠️ BOI API rate limit reached.")
-            return pd.DataFrame()
-        if resp.status_code != 200:
-            st.error(f"⚠️ BOI API error ({resp.status_code}).")
-            return pd.DataFrame()
-
-        return _parse_boi_response(resp.json())
-
-    except Exception as exc:
-        st.error(f"⚠️ BOI Error: {exc}")
-        return pd.DataFrame()
-
-
-# --- 2. Asset Data (Finnhub / Tiingo) ---
-_FINNHUB_QUOTE_URL = "https://finnhub.io/api/v1/quote"
-_FINNHUB_PROFILE_URL = "https://finnhub.io/api/v1/stock/profile2"
-_FINNHUB_DIVS_URL = "https://finnhub.io/api/v1/stock/dividend2"
-
-_TIINGO_QUOTE_URL = "https://api.tiingo.com/iex/{symbol}"
-_TIINGO_META_URL = "https://api.tiingo.com/tiingo/daily/{symbol}"
-
-
-def _finnhub_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
-    """Fetches price, currency, and dividend status from Finnhub."""
-    params = {"token": key, "symbol": symbol}
-
-    # 1. Price
-    q_resp = _SESSION.get(_FINNHUB_QUOTE_URL, params=params, timeout=10)
-    q_resp.raise_for_status()
-    price = float(q_resp.json().get("c", 0.0) or q_resp.json().get("pc", 0.0))
-    if price == 0.0:
-        raise ValueError("Zero price returned.")
-
-    # 2. Currency
-    p_resp = _SESSION.get(_FINNHUB_PROFILE_URL, params=params, timeout=10)
-    p_resp.raise_for_status()
-    currency = (p_resp.json().get("currency") or "USD").upper()
-
-    # 3. Dividends (Best effort)
-    pays_div = False
-    try:
-        d_resp = _SESSION.get(_FINNHUB_DIVS_URL, params=params, timeout=10)
-        if d_resp.status_code == 200:
-            pays_div = any(d.get("amount", 0) > 0 and d.get("year", 0) >= datetime.today().year - 1
-                           for d in (d_resp.json() or []))
-    except Exception:
-        pass
-
-    return price, currency, pays_div
-
-
-def _tiingo_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
-    """Fetches fallback data from Tiingo."""
-    headers = {"Authorization": f"Token {key}"}
-
-    # 1. Price
-    q_resp = _SESSION.get(_TIINGO_QUOTE_URL.format(symbol=symbol), headers=headers, timeout=10)
-    q_resp.raise_for_status()
-    data = q_resp.json()
-    if not data: raise ValueError("Empty quote.")
-    price = float(data[0].get("last") or data[0].get("tngoLast") or 0.0)
-
-    # 2. Currency
-    m_resp = _SESSION.get(_TIINGO_META_URL.format(symbol=symbol), headers=headers, timeout=10)
-    m_resp.raise_for_status()
-    currency = (m_resp.json().get("currency") or "USD").upper()
-
-    return price, currency, False
-
-
-@st.cache_data(ttl=3600)
-def fetch_asset_data(ticker_symbol: str):
-    """
-    Fetches real-time asset data using Finnhub (primary) and Tiingo (fallback).
-    Requires secrets configured in .streamlit/secrets.toml.
-    """
-    symbol = ticker_symbol.strip().upper()
-    fh_key = st.secrets.get("FINNHUB_API_KEY", "")
-    tg_key = st.secrets.get("TIINGO_API_KEY", "")
-
-    if not fh_key and not tg_key:
-        st.error("🚨 Missing API Keys in secrets.")
-        return 0.0, "ERROR", False
-
-    if fh_key:
-        try:
-            return _finnhub_fetch(symbol, fh_key)
-        except Exception as e:
-            st.warning(f"⚠️ Finnhub error: {e}. Trying fallback...")
-
-    if tg_key:
-        try:
-            return _tiingo_fetch(symbol, tg_key)
-        except Exception as e:
-            st.error(f"🚨 Tiingo error: {e}")
-
-    return 0.0, "ERROR", False
-
-
-def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
-    """Finds the USD/ILS exchange rate for a specific past date, strictly handling timezones."""
-    if df_history.empty:
-        return fallback_rate
-
-    try:
-        # 1. Create a clean, timezone-naive copy of the historical index
-        df_clean = df_history.copy()
-        df_clean.index = pd.to_datetime(df_clean.index).tz_localize(None).normalize()
-
-        # 2. Clean the target date from the user
-        target_dt = pd.to_datetime(target_date).normalize()
-
-        # 3. Use 'asof' to find the exact date, or the closest PREVIOUS trading day (for weekends/holidays)
-        closest_date = df_clean.index.asof(target_dt)
-
-        if pd.isna(closest_date):
-            return fallback_rate  # Target date is older than available history
-
-        rate = df_clean.loc[closest_date, 'Close']
-
-        # 4. Handle edge cases where Yahoo might return duplicate rows for the same day
-        if isinstance(rate, pd.Series):
-            return float(rate.iloc[0])
-
-        return float(rate)
-
-    except Exception as e:
-        # We silently fall back, but safely
-        return fallback_rate
-
-
-# ==========================================
-# TAX ENGINE: SECTION 91(B) + THE MOSES FILTER
-# ==========================================
-def calculate_portfolio_tax(lots: list, current_price: float, current_rate: float):
-    """Calculates Section 91(b) tax and offsetting based on the Moses Ruling."""
-    total_taxable_profit = 0.0
-    total_recognized_loss = 0.0
-    lot_results = []
-
-    for index, lot in enumerate(lots):
-        units = lot["Units"]
-        buy_price = lot["Price"]
-        buy_rate = lot["Rate"]
-
-        # Dollar & Shekel calculations
-        usd_profit = (current_price - buy_price) * units
-        nominal_ils_profit = (current_price * units * current_rate) - (buy_price * units * buy_rate)
-
-        taxable_profit = 0.0
-        recognized_loss = 0.0
-
-        # TAX LOGIC: Section 91(b) of the Israeli Income Tax Ordinance
-        # Limits the final tax liability so it never exceeds the nominal ILS profit.
-        # We calculate the theoretical tax on the real USD profit, and cap it at the nominal ILS profit.
-        if usd_profit > 0 and nominal_ils_profit > 0:
-            taxable_profit = min(usd_profit * current_rate, nominal_ils_profit)
-
-        # TAX LOGIC: The "Moses" Court Ruling (הלכת מוזס)
-        # Prevents investors from claiming artificial capital losses driven purely by currency devaluation.
-        # A recognized capital loss for tax offset is strictly the minimum between the real (USD) loss and the nominal (ILS) loss.
-        elif usd_profit < 0 and nominal_ils_profit < 0:
-            real_ils_loss = abs(usd_profit) * current_rate
-            nominal_ils_loss = abs(nominal_ils_profit)
-            recognized_loss = min(real_ils_loss, nominal_ils_loss)
-
-        total_taxable_profit += taxable_profit
-        total_recognized_loss += recognized_loss
-
-        lot_results.append({
-            "Lot #": index + 1,
-            "Orig. Date": lot.get("Date", "N/A"),
-            "Rem. Units": round(units, 4),
-            "USD Profit ($)": round(usd_profit, 2),
-            "Nominal ILS (₪)": round(nominal_ils_profit, 2),
-            "Taxable Profit (₪)": round(taxable_profit, 2),
-            "Recognized Loss (₪)": round(recognized_loss, 2)
-        })
-
-    # Auto-Offsetting (Netting)
-    net_taxable = max(0, total_taxable_profit - total_recognized_loss)
-    final_tax_liability = net_taxable * 0.25
-
-    return final_tax_liability, lot_results, total_taxable_profit, total_recognized_loss
-
 
 # ==========================================
 # SIDEBAR: GLOBAL SETTINGS
@@ -305,12 +49,15 @@ expected_return = st.sidebar.number_input("Expected Annual Return (%)", min_valu
                                           step=0.5)
 investment_horizon = st.sidebar.slider("Investment Horizon (Years)", min_value=1, max_value=30, value=10)
 
+# Security Fix: Fetching keys safely outside the cached function
+fh_key = st.secrets.get("FINNHUB_API_KEY", "")
+tg_key = st.secrets.get("TIINGO_API_KEY", "")
+
 with st.spinner("Initializing Market Data..."):
-    current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input)
+    current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input, fh_key, tg_key)
 
 future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0, max_value=10.0,
                                       value=float(current_rate), step=0.1)
-
 
 # ==========================================
 # MAIN DASHBOARD
@@ -332,7 +79,6 @@ try:
         help="It is highly recommended to read this comprehensive guide before making any decisions or executing trades in your brokerage account."
     )
 except FileNotFoundError:
-    # If the file is missing, we silently pass or display a placeholder
     pass
 
 # --- MODULE 1: MACRO VIEW (NOW INDEPENDENT) ---
@@ -359,7 +105,6 @@ if not df_ils.empty:
     ))
     fig1.add_hline(y=0, line_width=1.5, line_color="black", line_dash="dash")
 
-    # Static title, completely detached from the asset and its price
     chart_title = f"Tax Base Step-Up Potential (Current Rate: {current_rate:.4f} ILS)"
 
     fig1.update_layout(
@@ -395,12 +140,10 @@ edited_df = st.data_editor(
         "Action": st.column_config.SelectboxColumn("Action", options=["Buy", "Sell"], required=True),
         "Units": st.column_config.NumberColumn("Units", min_value=0.001, required=True),
         "Price (USD)": st.column_config.NumberColumn("Price (USD)", min_value=0.01, required=True),
-        "USD/ILS Rate": st.column_config.NumberColumn("USD/ILS Rate (Leave blank for Auto-Fill)", min_value=1.0,
-                                                      required=False),
+        "USD/ILS Rate": st.column_config.NumberColumn("USD/ILS Rate (Leave blank for Auto-Fill)", min_value=1.0, required=False),
     }
 )
 
-# Drop rows only if Date, Action, Units, or Price are NaN (Rate is allowed to be NaN now)
 edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Price (USD)"]).reset_index(drop=True)
 
 # Chronological FIFO Algorithm with Stable Sort
@@ -480,7 +223,6 @@ st.header("4. The Tax Engine: Section 91(b) & Moses Ruling")
 st.write(
     "This engine calculates your tax liability per lot, applying the Moses Ruling to separate recognized capital losses from nominal currency losses, and automatically offsets losses against profits.")
 
-# Run the updated Tax Engine
 total_tax_today, lot_results, tot_taxable, tot_loss = calculate_portfolio_tax(open_lots, current_price, current_rate)
 
 res_df = pd.DataFrame(lot_results)
@@ -488,16 +230,8 @@ with st.expander("🔍 Click to view Advanced Tax Lot Breakdown", expanded=True)
     st.dataframe(res_df, use_container_width=True)
 
 col_t1, col_t2 = st.columns(2)
-col_t1.metric(
-    "Total Taxable Profit",
-    f"₪{tot_taxable:,.2f}",
-    help="הרווח החייב במס לאחר הפעלת 'רצפת ההגנה' הנומינלית של סעיף 91(ב). המערכת מחשבת את המס על הנמוך מבין הרווח השקלי לרווח הדולרי."
-)
-col_t2.metric(
-    "Total Recognized Loss (Moses)",
-    f"₪{tot_loss:,.2f}",
-    help="הפסד הון המוכר לקיזוז מס. על פי 'הלכת מוזס', המערכת מזהה ומאפסת הפסדים שנוצרו אך ורק מהפרשי שער מטבע (כאשר אין הפסד כלכלי אמיתי בדולר)."
-)
+col_t1.metric("Total Taxable Profit", f"₪{tot_taxable:,.2f}")
+col_t2.metric("Total Recognized Loss (Moses)", f"₪{tot_loss:,.2f}")
 
 st.success(f"### 🎯 Final Estimated Tax Liability (If Reset Today): ₪{total_tax_today:,.2f}")
 
@@ -601,34 +335,34 @@ if total_tax_today == 0:
     if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
         if scenario_b_net[-1] > scenario_a_net[-1]:
             st.success(
-                "**Model Suggests: Potentially Beneficial.** Your current tax liability is ₪0 due to favorable exchange rate conditions. The model indicates that executing a Tax Base Reset today may raise your future tax shield effectively at zero current tax cost.")
+                "**Optimal Condition (The Holy Grail):** Your current tax liability is ₪0 due to favorable exchange rate conditions, despite having unrealized USD profits! It is mathematically optimal to execute a Tax Base Reset today, raising your future tax shield at zero tax cost.")
         else:
             st.error(
-                "**Model Suggests: Potential Value Destruction.** Although your current tax liability is ₪0, executing a reset today would **lower** your original tax base. The 'HOLD' strategy appears mathematically superior.")
+                "**Warning (Value Destroyer):** Although your current tax liability is ₪0, executing a reset today would **lower** your original tax base. In the future, you will pay more tax on the growth than if you simply held. The 'HOLD' strategy is mathematically superior.")
 
 elif breakeven_year:
     if breakeven_year == 1:
         st.error(
-            f"**Model Suggests: Not Profitable.** Under your {expected_return}% return projection, the tax and friction costs paid today significantly hurt your compound interest. 'HOLD' appears to be the better strategy immediately.")
+            f"**Warning:** Resetting the tax base is **not profitable**. Under your {expected_return}% return projection, the tax paid today permanently cripples your compound interest. 'HOLD' wins immediately.")
     else:
         st.warning(
-            f"**Model Suggests: Time-Sensitive Strategy.** Resetting today is projected to be profitable ONLY IF you plan to sell within the next **{breakeven_year - 1} years**. \n\nFrom **Year {breakeven_year}** onwards, the 'HOLD' strategy wins.")
+            f"**Time-Sensitive Strategy:** Resetting today is profitable ONLY IF you sell within the next **{breakeven_year - 1} years**. \n\nFrom **Year {breakeven_year}** onwards, the 'HOLD' strategy wins because the compound interest lost on the tax paid today exceeds your future tax savings.")
 
 else:
     st.success(
-        f"**Model Suggests: Long-Term Benefit.** Within your {investment_horizon}-year horizon, the Tax Base Step-Up is projected to remain profitable. The future tax savings outweigh the lost compound interest.")
+        f"**Strategy Validated:** Within your {investment_horizon}-year horizon, the Tax Base Step-Up remains highly profitable. The tax savings outweigh the lost compound interest for the entire projected period.")
 
 # Actionable Disclaimer Box
 disclaimer_items = [
     "⚠️ <b>הבהרה משפטית:</b> תוצאות הסימולציה מבוססות על מודל מתמטי והערכות עתידיות. המערכת נועדה למטרות מחקר, לימוד והדגמה בלבד, ואינה מהווה ייעוץ מס פרטני, ייעוץ פיננסי, או המלצה לביצוע פעולות בשוק ההון. חובה להתייעץ עם רואה חשבון או יועץ מס מוסמך טרם קבלת החלטות פיננסיות.",
     "💡 <b>נקודות קריטיות לתשומת לב לקראת ביצוע:</b> הסימולציה מציגה את השפעת מס רווח ההון על הקרן בלבד. ביצוע \"העלאת מס בסיס\" בפועל דורש שתי פעולות רצופות, ולכן חובה לוודא מול הברוקר:",
-    "<b>1. חישוב עמלות שמרני (Friction Costs):</b> בתיקים קטנים, עמלות קנייה ומכירה עלולות למחוק את רוב או כל חיסכון המס. הסימולטור מפחית את העמלות שהזנת מסך ההון הזמין להשקעה מחדש, אך למען פשטות המודל, הן <b>אינן</b> משוקללות לתוך בסיס המס ההיסטורי (Adjusted Cost Basis). חישוב פרטני אצל רואה חשבון עשוי להקטין את חבות המס שלך אף יותר מהמוצג.",
+    "<b>1. עמלות מינימום:</b> קח בחשבון עמלות קנייה ומכירה. בתיקים קטנים, עמלות המינימום עלולות למחוק את רוב או כל חיסכון המס. אנא ודא כי הזנת את העלות המשוערת של עמלות אלו בשדה המיועד לכך בתפריט הסימולטור (Friction Costs) כדי לקבל תוצאה מדויקת.",
     "<b>2. סכנת המרה כפולה:</b> ודא שתמורת המכירה נכנסת לחשבון המט\"ח (USD) ו<b>שלא</b> מתבצעת המרה אוטומטית לשקלים, כדי למנוע עמלות חליפין ופערי שער (Spread) מיותרים.",
     "<b>3. פערי ציטוט בשוק (Bid-Ask Spread):</b> מעבר לעמלות הקנייה והמכירה של הברוקר, פעולה מהירה בשוק ההון כרוכה בעלות חיכוך מובנית. בעת פעולת ה\"איפוס\", אתה תיאלץ למכור את הנכס במחיר הקונה (Bid) הנמוך מעט, ומיד לקנות אותו במחיר המוכר (Ask) הגבוה מעט. בניירות ערך חסרי נזילות (סחירות נמוכה), פער זה מתרחב ועלול למחוק חלק מחיסכון המס.",
     "<b>4. סכנת \"עסקה מלאכותית\" (סעיף 86 לפקודה):</b> מכירה וקנייה מיידית של <i>אותו נייר ערך בדיוק</i> עלולה להיות מסווגת על ידי מס הכנסה כעסקה מלאכותית (Wash Sale), מה שעשוי לאיין את ההכרה באירוע המס. כדי להתמודד עם סוגיה זו ולשמור על החשיפה לשוק, משקיעים רבים בוחרים לבצע את הרכישה החוזרת בקרן מחקה עוקבת של יצרן אחר (למשל, מכירת קרן SPY ורכישת קרן VOO או IVV באותו רגע), או לחלופין, להמתין מספר ימי מסחר לפני הרכישה החוזרת.",
     "<b>5. מגבלות בחירת שכבות מס (סכנת ה\"זיהוי הספציפי\"):</b> הסימולטור מניח מימוש בשיטת FIFO (נכנס ראשון, יוצא ראשון), שהיא ברירת המחדל החוקית בישראל. אם אתה סוחר דרך בנק או בית השקעות ישראלי, שיטה זו נכפית עליך אוטומטית במערכת. אם אתה סוחר דרך ברוקר זר ומתכנן למכור שכבה ספציפית (Specific Identification) כדי לייעל את המס, שים לב כי הסימולטור אינו תומך בתרחיש זה ומנוע המס שלו מבוסס בלעדית על אלגוריתם ה-FIFO.",
-    "<b>6. פרשנות מחמירה לקיזוז הפסדים (הלכת מוזס):</b> אם הנכס נמצא בהפסד שקלי ואתה שוקל למכור אותו רק כדי לקזז רווחים אחרים, שים לב: הסימולטור נוקט בפרשנות שמרנית לפסיקה (ולחוזר מס הכנסה 10/2025). הפסד הון הנובע <i>אך ורק</i> משחיקת שער המטבע יאופס לחלוטין ולא יוכר לקיזוז במערכת. הפעולה במקרה זה עלולה \"להשמיד ערך\" ולהוריד את בסיס המס ההיסטורי מבלי להעניק מגן מס.",
-    "<b>7. מס יסף (Surtax):</b> הסימולטור מחשב את אירוע המס לפי שיעור בסיס של 25%. משקיעים החוצים את מדרגות ההכנסה הגבוהות (למעלה מכ-700 אלף ש\"ח בשנה, כולל הרווח הרעיוני שייווצר מהאיפוס עצמו) כפופים למס יסף של 3% ומעלה בהתאם למדרגות החוק. תוספת זו אינה משוקללת במודל ועלולה להאריך משמעותית את זמן החזר ההשקעה (Breakeven)."
+    "<b>6. אשליית קיזוז הפסדים (הלכת מוזס):</b> אם הנכס נמצא בהפסד שקלי ואתה שוקל למכור אותו רק כדי לקזז רווחים מניירות ערך אחרים, שים לב: \"הלכת מוזס\" קובעת כי הפסד הון הנובע <i>אך ורק</i> משחיקת שער המטבע אינו מוכר כהפסד הון בר-קיזוז לצורכי מס. הפעולה במקרה זה עלולה \"להשמיד ערך\" ולהוריד את בסיס המס ההיסטורי שלך מבלי להעניק לך מגן מס אמיתי בהווה.",
+    "<b>7. מס יסף (Surtax):</b> הסימולטור מחשב את אירוע המס לפי שיעור בסיס של 25%. משקיעים החוצים את תקרת ההכנסות השנתית (למעלה מ-700 אלף ש\"ח, כולל הרווח הרעיוני שייווצר מהאיפוס עצמו) עשויים להיות מחויבים במס יסף של 3% נוספים (סה\"כ 28%). תוספת זו אינה משוקללת במודל ועלולה לשנות את כדאיות האסטרטגיה."
 ]
 
 # TAX LOGIC: Append the dividend warning ONLY if the asset pays dividends
