@@ -365,7 +365,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Warning callout right under the tax liability if shield is burned
 # Warning callout right under the tax liability if shield is burned
 if total_tax_today == 0 and total_burned_shield > 0:
-    st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>⚠️ שים לב:</b> תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של <b>₪{total_burned_shield:,.2f}</b>. במצב זה, מידת הכדאיות תלויה לחלוטין בהתפתחות העתידית של שער הדולר וערך המניה. המשיכו לגרף מטה לניתוח שובר שוויון (Breakeven).</div>', unsafe_allow_html=True)
+    st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>⚠️ שים לב:</b> תשלום המס היום הוא אכן אפס, אך במחיר של שריפת חיסכון מס עתידי בשווי של <b>₪{total_burned_shield:,.2f}</b>. במצב זה, מידת הכדאיות תלויה לחלוטין בהתפתחות העתידית של שער הדולר וערך המניה. המשיכו לגרף מטה לניתוח שובר שוויון (Breakeven).</div>', unsafe_allow_html=True)
 
 # --- MODULE 5: CFO STRATEGY (BREAKEVEN) ---
 st.markdown("---")
