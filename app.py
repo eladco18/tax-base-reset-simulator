@@ -62,9 +62,8 @@ future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0,
 # ==========================================
 # MAIN DASHBOARD
 # ==========================================
-st.title("📊 Capital Gains Tax Simulator: Tax Basis Step-Up Strategy")
-st.markdown(
-    "Evaluate the financial viability of a **Tax Basis Step-Up** strategy under Section 91(b) of the Israeli Income Tax Ordinance.")
+st.markdown("<h1 dir='rtl' style='text-align: right;'>📊 סימולטור מס רווחי הון: אסטרטגיית העלאת בסיס מס</h1>", unsafe_allow_html=True)
+st.markdown('<div dir="rtl" style="text-align: right; font-size: 1.1rem; margin-bottom: 20px;">הערכת הכדאיות הכלכלית של אסטרטגיית <b>"העלאת בסיס מס" (Tax Base Step-Up)</b> בהתאם לסעיף 91(ב) לפקודת מס הכנסה.</div>', unsafe_allow_html=True)
 
 # --- PDF DOWNLOAD BUTTON ---
 try:
@@ -72,20 +71,18 @@ try:
         pdf_bytes = pdf_file.read()
 
     st.download_button(
-        label="📄 Download the Complete Strategy Guide (PDF)",
+        label="📄 להורדת המדריך האסטרטגי המלא (PDF)",
         data=pdf_bytes,
         file_name="Tax_Base_Step-Up_Guide.pdf",
         mime="application/pdf",
-        help="It is highly recommended to read this comprehensive guide before making any decisions or executing trades in your brokerage account."
+        help="מומלץ מאוד לקרוא מדריך מקיף זה בטרם קבלת החלטות מס או ביצוע פעולות בחשבון ההשקעות שלכם."
     )
 except FileNotFoundError:
     pass
 
 # --- MODULE 1: MACRO VIEW (NOW INDEPENDENT) ---
-st.header("1. Macro View: Historical Tax Shield Potential")
-st.markdown(
-    "This chart displays the historical strength of the USD vs. ILS compared to today's rate. A higher past rate translates to a larger potential tax shield today, regardless of the specific asset.")
-
+st.markdown("<h2 dir='rtl' style='text-align: right;'>1. מבט מאקרו: פוטנציאל מגן המס ההיסטורי</h2>", unsafe_allow_html=True)
+st.markdown('<div dir="rtl" style="text-align: right; margin-bottom: 15px;">גרף זה מציג את החוזק ההיסטורי של הדולר מול השקל בהשוואה לשער של היום. שער היסטורי גבוה יותר מתורגם לפוטנציאל גבוה יותר של מגן מס היום, ללא תלות בנכס ספציפי.</div>', unsafe_allow_html=True)
 start_date = st.date_input("Display USD/ILS history starting from:", value=pd.to_datetime(default_start))
 
 with st.spinner("Fetching macro data..."):
@@ -113,15 +110,14 @@ if not df_ils.empty:
         template="plotly_white", hovermode="x unified", margin=dict(l=0, r=0, t=40, b=0)
     )
     st.plotly_chart(fig1, use_container_width=True)
-    st.caption(
-        "* **Note on Exchange Rates:** The system fetches the official Representative Rate (שער יציג) from the Bank of Israel. This rate is published once a day (Mon-Fri) around 15:30 Israel time. Therefore, during morning hours or weekends, the rate reflects the last published business day. For Israeli tax purposes, capital gains are legally calculated using this official daily rate, not live continuous Forex rates.")
+    st.markdown('<div dir="rtl" style="text-align: right; font-size: 0.85rem; color: gray; margin-top: 10px;">* <b>הערה לגבי שערי חליפין:</b> המערכת שואבת את השער היציג הרשמי מבנק ישראל. שער זה מפורסם פעם ביום (ב\'-ו\') סביב השעה 15:30 שעון ישראל. לכן, בשעות הבוקר או בסופי שבוע, השער משקף את יום העסקים האחרון שפורסם. לצורכי מס בישראל, רווחי הון מחושבים חוקית על בסיס שער יציג זה, ולא לפי שערי מסחר רציף (Forex).</div>', unsafe_allow_html=True)
 else:
-    st.warning("Historical exchange rate data is currently unavailable.")
+    st.markdown('<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;">⚠️ נתוני שער חליפין היסטוריים אינם זמינים כרגע.</div>', unsafe_allow_html=True)
 
 # --- MODULE 2: THE FULL LEDGER ---
 st.markdown("---")
-st.header("2. The Ledger: Historical Transactions")
-st.write(f"Enter your transaction history for **{ticker_input}**. The system will calculate your current open lots using the **FIFO** method.")
+st.markdown("<h2 dir='rtl' style='text-align: right;'>2. יומן העסקאות: היסטוריית פעולות (Ledger)</h2>", unsafe_allow_html=True)
+st.markdown(f'<div dir="rtl" style="text-align: right; margin-bottom: 15px;">הזינו את היסטוריית הרכישות והמכירות שלכם עבור <b>{ticker_input}</b>. המערכת תחשב את שכבות המס הפתוחות (Tax Lots) בתיק שלכם על בסיס שיטת ה-<b>FIFO</b> (נכנס ראשון, יוצא ראשון).</div>', unsafe_allow_html=True)
 
 # --- Contextual Market Snapshot ---
 st.info(
@@ -194,7 +190,7 @@ if validation_error:
 
 # --- MODULE 3: SANITY CHECK ---
 st.markdown("---")
-st.header("3. Current Portfolio & Sanity Check")
+st.markdown("<h2 dir='rtl' style='text-align: right;'>3. תמונת מצב התיק ואימות נתונים (Sanity Check)</h2>", unsafe_allow_html=True)
 
 total_units_remaining = sum(lot["Units"] for lot in open_lots)
 total_usd_value = total_units_remaining * current_price
@@ -205,13 +201,12 @@ col1.metric("Current Open Shares", f"{total_units_remaining:,.4f}")
 col2.metric("Total Current Value (USD)", f"${total_usd_value:,.2f}")
 col3.metric("Total Current Value (ILS)", f"₪{total_ils_value:,.2f}")
 
-st.info(
-    "💡 **Best Practice:** Verify that the 'Current Open Shares' matches the exact balance in your brokerage account.")
-sanity_verified = st.checkbox("I confirm that this accurately reflects my current portfolio.")
+st.markdown('<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; color: #004085; text-align: right; font-family: sans-serif; margin-bottom: 15px;">💡 <b>המלצת מערכת (Best Practice):</b> ודאו ש"סך יחידות פתוחות" (Current Open Shares) תואם במדויק ליתרה המופיעה בחשבון הברוקר או הבנק שלכם.</div>', unsafe_allow_html=True)
+
+sanity_verified = st.checkbox("אני מאשר/ת שהנתונים משקפים במדויק את התיק הנוכחי שלי.")
 
 if not sanity_verified:
-    st.warning(
-        "🔒 Please verify your data and check the confirmation box above to unlock the Tax Engine and CFO Strategy.")
+    st.markdown('<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; font-family: sans-serif;">🔒 אנא אשרו את הנתונים בתיבת הסימון מעלה כדי לפתוח את מנוע המס (Tax Engine) ואת האסטרטגיה הפיננסית.</div>', unsafe_allow_html=True)
     st.stop()
 elif total_units_remaining <= 0:
     st.warning("Your current balance is 0. There are no open lots to simulate.")
@@ -219,13 +214,12 @@ elif total_units_remaining <= 0:
 
 # --- MODULE 4: THE TAX ENGINE ---
 st.markdown("---")
-st.header("4. The Tax Engine: Section 91(b) & Moses Ruling")
-st.write(
-    "This engine calculates your tax liability per lot, applying the Moses Ruling to separate recognized capital losses from nominal currency losses, and automatically offsets losses against profits.")
+st.markdown("<h2 dir='rtl' style='text-align: right;'>4. מנוע המס: סעיף 91(ב) והלכת מוזס</h2>", unsafe_allow_html=True)
+st.markdown('<div dir="rtl" style="text-align: right; margin-bottom: 15px;">מנוע זה מפרק את התיק ומחשב חבות מס עבור כל שכבת רכישה (Tax Lot) בנפרד. הוא מיישם את "הלכת מוזס" כדי להפריד בין הפסדי הון מוכרים להפסדי מטבע נומינליים שאינם מוכרים, ומבצע קיזוז הפסדים אוטומטי מול הרווחים.</div>', unsafe_allow_html=True)
 
 total_tax_today, lot_results, tot_taxable, tot_loss, total_burned_shield = calculate_portfolio_tax(open_lots, current_price, current_rate)
 res_df = pd.DataFrame(lot_results)
-with st.expander("🔍 Click to view Advanced Tax Lot Breakdown", expanded=True):
+with st.expander("🔍 צפו בפירוט שכבות המס (Advanced Tax Lot Breakdown)", expanded=True):
     # Apply a soft red background to the new 'Lost Cash Shield' column if it exists
     def highlight_burned(val):
         color = '#ffcccc' if isinstance(val, (int, float)) and val > 0 else ''
@@ -238,28 +232,28 @@ with st.expander("🔍 Click to view Advanced Tax Lot Breakdown", expanded=True)
         st.dataframe(res_df, use_container_width=True)
 
 col_t1, col_t2, col_t3 = st.columns(3)
-col_t1.metric("Total Taxable Profit", f"₪{tot_taxable:,.2f}")
-col_t2.metric("Total Recognized Loss (Moses)", f"₪{tot_loss:,.2f}")
+col_t1.metric("סה״כ רווח חייב במס", f"₪{tot_taxable:,.2f}")
+col_t2.metric("סה״כ הפסד הון מוכר (מוזס)", f"₪{tot_loss:,.2f}")
 
 # Display the burned shield metric visually
 if total_burned_shield > 0:
-    col_t3.metric("🔥 Total Lost Cash Shield", f"₪{total_burned_shield:,.2f}", delta="Step-Down Penalty",
+    col_t3.metric("🔥 מגן מס (מזומן) שנשרף", f"₪{total_burned_shield:,.2f}", delta="קנס הורדת בסיס (Step-Down)",
                   delta_color="inverse")
 else:
-    col_t3.metric("🏆 Total Lost Cash Shield", "₪0.00", delta="Golden Point Intact", delta_color="normal")
+    col_t3.metric("🏆 מגן מס (מזומן) שנשרף", "₪0.00", delta="נקודת הקיזוז המושלם נשמרה", delta_color="normal")
 
-st.success(f"### 🎯 Final Estimated Tax Liability (If Reset Today): ₪{total_tax_today:,.2f}")
+st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 20px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><h3 style="margin: 0;">🎯 חבות המס הסופית (אם נבצע איפוס היום): ₪{total_tax_today:,.2f}</h3></div>', unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Warning callout right under the tax liability if shield is burned
 if total_tax_today == 0 and total_burned_shield > 0:
-    st.warning(
-        f"**שים לב:** תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של **₪{total_burned_shield:,.2f}**. המשך לגרף מטה כדי לבדוק אם אובדן זה משתלם אל מול התחזיות העתידיות שלך.")
+    st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>⚠️ שים לב:</b> תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של <b>₪{total_burned_shield:,.2f}</b>. המשיכו לגרף מטה כדי לבדוק אם אובדן זה משתלם אל מול התחזיות העתידיות שלכם.</div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
 # --- MODULE 5: CFO STRATEGY (BREAKEVEN) ---
 st.markdown("---")
-st.header("5. Strategic Analysis: Tax Savings vs. Compound Interest")
-st.write(
-    "Does it make mathematical sense to pay tax today to raise your tax base? Let's project the Net ILS value (after final tax) for both scenarios.")
+st.markdown("<h2 dir='rtl' style='text-align: right;'>5. ניתוח אסטרטגי: חיסכון במס מול ריבית דריבית</h2>", unsafe_allow_html=True)
+st.markdown('<div dir="rtl" style="text-align: right; margin-bottom: 15px;">האם יש היגיון מתמטי לשלם מס היום כדי להעלות את בסיס המס העתידי שלכם? לפניכם תחזית של שווי התיק נטו בשקלים (לאחר תשלום המס הסופי) עבור שני התרחישים.</div>', unsafe_allow_html=True)
 
 years = np.arange(1, investment_horizon + 1)
 scenario_a_net = []  # HOLD
@@ -350,8 +344,7 @@ fig2.update_xaxes(
 st.plotly_chart(fig2, use_container_width=True)
 
 # CFO Verdict
-# CFO Verdict
-st.subheader("CFO Verdict ⚖️")
+st.markdown("<br><h3 dir='rtl' style='text-align: right;'>⚖️ פסק הדין האסטרטגי (CFO Verdict)</h3>", unsafe_allow_html=True)
 
 # Calculate total USD status to identify the Matrix Scenario
 total_orig_usd_cost = sum(lot["Price"] * lot["Units"] for lot in open_lots)
@@ -361,42 +354,40 @@ total_usd_profit_today = total_usd_value - total_orig_usd_cost
 if total_tax_today == 0 and total_usd_profit_today > 0:
     # We have a dollar profit and zero tax. Check the Golden Point metric.
     if total_burned_shield <= 1.0: # Margin of error for floating points
-        st.success("#### 🏆 תרחיש 1: The Golden Point (נקודת הקיזוז המושלם)")
-        st.write("מצב אידיאלי: אתה מקבע את הרווח הדולרי ומקפיץ את בסיס המס (Step-Up) באפס מס, **מבלי להקריב מטריית הגנה שקלית**. פעולה כירורגית ואופטימלית.")
+        st.markdown('<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><h4 style="margin-top: 0;">🏆 תרחיש 1: The Golden Point (נקודת הקיזוז המושלם)</h4>מצב אידיאלי: אתם מקבעים את הרווח הדולרי ומקפיצים את בסיס המס (Step-Up) באפס מס, <b>מבלי להקריב מטריית הגנה שקלית</b>. פעולה כירורגית ואופטימלית.</div>', unsafe_allow_html=True)
     else:
-        st.warning("#### ⚠️ תרחיש 2: מלכודת ה-Step-Down השקלית")
-        st.write(f"פעולה בסיכון: תשלום המס היום הוא 0 ₪, אך אתה **זורק לפח מגן מס עתידי בשווי של ₪{total_burned_shield:,.2f}**.")
+        st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><h4 style="margin-top: 0;">⚠️ תרחיש 2: מלכודת ה-Step-Down השקלית</h4>פעולה בסיכון: תשלום המס היום הוא 0 ₪, אך אתם <b>זורקים לפח מגן מס עתידי בשווי של ₪{total_burned_shield:,.2f}</b>.</div>', unsafe_allow_html=True)
 
 elif total_tax_today > 0 and total_usd_profit_today > 0:
-    st.error("#### 🛑 תרחיש 3: הקדמת מס מיותרת")
-    st.write(f"הפעולה תגרור תשלום מס מיידי במזומן של **₪{total_tax_today:,.2f}**. הוצאת נזילות מהתיק פוגעת אנושות באפקט הריבית דריבית.")
+    st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><h4 style="margin-top: 0;">🛑 תרחיש 3: הקדמת מס מיותרת</h4>הפעולה תגרור תשלום מס מיידי במזומן של <b>₪{total_tax_today:,.2f}</b>. הוצאת נזילות מהתיק פוגעת אנושות באפקט הריבית דריבית.</div>', unsafe_allow_html=True)
 
 elif total_usd_profit_today <= 0:
-    st.info("#### 📉 תרחיש 4/5: השמדת ערך או אשליית מטבע")
-    st.write("הנכס נמצא בהפסד דולרי. ביצוע איפוס עכשיו מהווה הורדת בסיס (Step-Down). אסטרטגיה זו כדאית אך ורק במקרה של 'מכירה רעיונית' שבה מנצלים את ההפסד המוכר לקיזוז מיידי מול נכסים מורווחים אחרים בתיק.")
+    st.markdown('<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><h4 style="margin-top: 0;">📉 תרחיש 4/5: השמדת ערך או אשליית מטבע</h4>הנכס נמצא בהפסד דולרי. ביצוע איפוס עכשיו מהווה הורדת בסיס (Step-Down). אסטרטגיה זו כדאית אך ורק במקרה של "מכירה רעיונית" שבה מנצלים את ההפסד המוכר לקיזוז מיידי מול נכסים מורווחים אחרים בתיק.</div>', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # --- STAGE 2: FUTURE PROJECTIONS ANALYSIS (THE BREAKEVEN LOGIC) ---
 st.markdown("---")
-st.markdown("#### 🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)")
+st.markdown("<h4 dir='rtl' style='text-align: right;'>🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)</h4>", unsafe_allow_html=True)
 
 # Re-use the existing breakeven logic, now presented as an additional layer of validation
 if total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0:
     # Specific forward-looking analysis for Scenario 2 (The Trade-Off)
     if len(scenario_b_net) > 0 and len(scenario_a_net) > 0 and scenario_b_net[-1] > scenario_a_net[-1]:
-         st.success("**שבירת המלכודת:** מנוע התחזיות קובע שעל אף שאתה שורף מגן מס שקלי היום, תחזית העלייה של הדולר שהזנת מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה **מנצחת את חלופת ה-HOLD** לאורך תקופת ההשקעה.")
+         st.markdown('<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>שבירת המלכודת:</b> מנוע התחזיות קובע שעל אף שאתם שורפים מגן מס שקלי היום, תחזית העלייה של הדולר שהזנתם מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה <b>מנצחת את חלופת ה-HOLD</b> לאורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
     else:
-         st.error("**השמדת ערך ודאית:** מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.")
+         st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.</div>', unsafe_allow_html=True)
 
 elif breakeven_year:
     if breakeven_year == 1:
-        st.error(f"אזהרה חמורה: תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.")
+        st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה חמורה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>', unsafe_allow_html=True)
     else:
-        st.warning(f"**חלון זמנים מוגבל (Time-Sensitive):** האסטרטגיה רווחית אך ורק אם תמשוך את הכסף ב-**{breakeven_year - 1} השנים הקרובות**. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.")
+        st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תמשכו את הכסף ב-<b>{breakeven_year - 1} השנים הקרובות</b>. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
 else:
     if total_tax_today > 0 or total_usd_profit_today <= 0:
-        st.success(f"למרות החיסכון במס, על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון להחזקה (HOLD) או כדאיות רק תחת שיקולי קיזוז חיצוניים.")
+        st.markdown(f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;">למרות החיסכון במס, על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון להחזקה (HOLD) או כדאיות רק תחת שיקולי קיזוז חיצוניים.</div>', unsafe_allow_html=True)
     else:
-        st.success(f"**אסטרטגיה מנצחת:** על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת. החיסכון במס ממקסם את הוצאת הכספים במועד המשיכה הסופי.")
+        st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת. החיסכון במס ממקסם את הוצאת הכספים במועד המשיכה הסופי.</div>', unsafe_allow_html=True)
 
 # Actionable Disclaimer Box
 disclaimer_items = [
