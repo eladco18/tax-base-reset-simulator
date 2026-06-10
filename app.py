@@ -154,10 +154,31 @@ st.markdown(
     unsafe_allow_html=True)
 
 # Custom RTL Label for the Date Input
+# Anchor max_value to Israel time (UTC+3) to prevent future-date selection
+_ISRAEL_TZ = timezone(timedelta(hours=3))
+_today_il = datetime.now(_ISRAEL_TZ).date()
+
 st.markdown(
     "<div dir='rtl' style='text-align: right; font-weight: bold; margin-bottom: 5px;'>הציגו היסטוריית שער דולר/שקל החל מתאריך:</div>",
     unsafe_allow_html=True)
-start_date = st.date_input("", value=pd.to_datetime(default_start), label_visibility="collapsed")
+start_date = st.date_input(
+    "",
+    value=pd.to_datetime(default_start).date(),
+    min_value=datetime(2000, 1, 1).date(),
+    max_value=_today_il,
+    label_visibility="collapsed"
+)
+
+# Belt-and-suspenders: block future dates that slip through via session state replay
+if start_date > _today_il:
+    st.markdown(
+        '<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; '
+        'color: #721c24; text-align: right; border: 1px solid #f5c6cb; font-family: sans-serif;">'
+        '📅 <b>תאריך לא חוקי:</b> לא ניתן לבחור תאריך עתידי. '
+        'בנק ישראל מפרסם שערים היסטוריים בלבד. אנא בחרו תאריך עד <b>היום</b> לכל היותר.'
+        '</div>',
+        unsafe_allow_html=True)
+    st.stop()
 
 with st.spinner("מושך נתוני מאקרו..."):
     df_ils = fetch_historical_exchange_rates(start_date.strftime('%Y-%m-%d'))
