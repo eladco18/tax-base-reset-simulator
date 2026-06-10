@@ -164,7 +164,7 @@ st.markdown(
 start_date = st.date_input(
     "",
     value=pd.to_datetime(default_start).date(),
-    min_value=datetime(2000, 1, 1).date(),
+    min_value=datetime(1980, 1, 1).date(),
     max_value=_today_il,
     label_visibility="collapsed"
 )
