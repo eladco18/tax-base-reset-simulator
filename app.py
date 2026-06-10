@@ -57,7 +57,7 @@ with st.spinner("Initializing Market Data..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input, fh_key, tg_key)
 
 future_rate = st.sidebar.number_input("Est. Future USD/ILS Rate", min_value=1.0, max_value=10.0,
-                                      value=float(current_rate), step=0.1)
+                                      value=3.5, step=0.1)
 
 # ==========================================
 # MAIN DASHBOARD
@@ -223,17 +223,37 @@ st.header("4. The Tax Engine: Section 91(b) & Moses Ruling")
 st.write(
     "This engine calculates your tax liability per lot, applying the Moses Ruling to separate recognized capital losses from nominal currency losses, and automatically offsets losses against profits.")
 
-total_tax_today, lot_results, tot_taxable, tot_loss = calculate_portfolio_tax(open_lots, current_price, current_rate)
-
+total_tax_today, lot_results, tot_taxable, tot_loss, total_burned_shield = calculate_portfolio_tax(open_lots, current_price, current_rate)
 res_df = pd.DataFrame(lot_results)
 with st.expander("🔍 Click to view Advanced Tax Lot Breakdown", expanded=True):
-    st.dataframe(res_df, use_container_width=True)
+    # Apply a soft red background to the new 'Lost Cash Shield' column if it exists
+    def highlight_burned(val):
+        color = '#ffcccc' if isinstance(val, (int, float)) and val > 0 else ''
+        return f'background-color: {color}'
 
-col_t1, col_t2 = st.columns(2)
+    if "Lost Cash Shield (₪)" in res_df.columns:
+        styled_df = res_df.style.map(highlight_burned, subset=["Lost Cash Shield (₪)"])
+        st.dataframe(styled_df, use_container_width=True)
+    else:
+        st.dataframe(res_df, use_container_width=True)
+
+col_t1, col_t2, col_t3 = st.columns(3)
 col_t1.metric("Total Taxable Profit", f"₪{tot_taxable:,.2f}")
 col_t2.metric("Total Recognized Loss (Moses)", f"₪{tot_loss:,.2f}")
 
+# Display the burned shield metric visually
+if total_burned_shield > 0:
+    col_t3.metric("🔥 Total Lost Cash Shield", f"₪{total_burned_shield:,.2f}", delta="Step-Down Penalty",
+                  delta_color="inverse")
+else:
+    col_t3.metric("🏆 Total Lost Cash Shield", "₪0.00", delta="Golden Point Intact", delta_color="normal")
+
 st.success(f"### 🎯 Final Estimated Tax Liability (If Reset Today): ₪{total_tax_today:,.2f}")
+
+# Warning callout right under the tax liability if shield is burned
+if total_tax_today == 0 and total_burned_shield > 0:
+    st.warning(
+        f"**שים לב:** תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של **₪{total_burned_shield:,.2f}**. המשך לגרף מטה כדי לבדוק אם אובדן זה משתלם אל מול התחזיות העתידיות שלך.")
 
 # --- MODULE 5: CFO STRATEGY (BREAKEVEN) ---
 st.markdown("---")
@@ -267,12 +287,13 @@ for y in years:
     future_price_y = current_price * ((1 + (expected_return / 100)) ** y)
 
     # Scenario A projection
-    tax_a, _, _, _ = calculate_portfolio_tax(open_lots, future_price_y, future_rate)
+    # Scenario A projection
+    tax_a, _, _, _, _ = calculate_portfolio_tax(open_lots, future_price_y, future_rate)
     gross_ils_a = total_units_remaining * future_price_y * future_rate
     scenario_a_net.append(gross_ils_a - tax_a)
 
     # Scenario B projection
-    tax_b, _, _, _ = calculate_portfolio_tax(reset_lot, future_price_y, future_rate)
+    tax_b, _, _, _, _ = calculate_portfolio_tax(reset_lot, future_price_y, future_rate)
     gross_ils_b = new_units * future_price_y * future_rate
     scenario_b_net.append(gross_ils_b - tax_b)
 
@@ -329,28 +350,53 @@ fig2.update_xaxes(
 st.plotly_chart(fig2, use_container_width=True)
 
 # CFO Verdict
+# CFO Verdict
 st.subheader("CFO Verdict ⚖️")
 
-if total_tax_today == 0:
-    if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
-        if scenario_b_net[-1] > scenario_a_net[-1]:
-            st.success(
-                "**Optimal Condition (The Holy Grail):** Your current tax liability is ₪0 due to favorable exchange rate conditions, despite having unrealized USD profits! It is mathematically optimal to execute a Tax Base Reset today, raising your future tax shield at zero tax cost.")
-        else:
-            st.error(
-                "**Warning (Value Destroyer):** Although your current tax liability is ₪0, executing a reset today would **lower** your original tax base. In the future, you will pay more tax on the growth than if you simply held. The 'HOLD' strategy is mathematically superior.")
+# Calculate total USD status to identify the Matrix Scenario
+total_orig_usd_cost = sum(lot["Price"] * lot["Units"] for lot in open_lots)
+total_usd_profit_today = total_usd_value - total_orig_usd_cost
+
+# --- STAGE 1: IDENTIFY THE CURRENT SCENARIO (THE MATRIX) ---
+if total_tax_today == 0 and total_usd_profit_today > 0:
+    # We have a dollar profit and zero tax. Check the Golden Point metric.
+    if total_burned_shield <= 1.0: # Margin of error for floating points
+        st.success("#### 🏆 תרחיש 1: The Golden Point (נקודת הקיזוז המושלם)")
+        st.write("מצב אידיאלי: אתה מקבע את הרווח הדולרי ומקפיץ את בסיס המס (Step-Up) באפס מס, **מבלי להקריב מטריית הגנה שקלית**. פעולה כירורגית ואופטימלית.")
+    else:
+        st.warning("#### ⚠️ תרחיש 2: מלכודת ה-Step-Down השקלית")
+        st.write(f"פעולה בסיכון: תשלום המס היום הוא 0 ₪, אך אתה **זורק לפח מגן מס עתידי בשווי של ₪{total_burned_shield:,.2f}**.")
+
+elif total_tax_today > 0 and total_usd_profit_today > 0:
+    st.error("#### 🛑 תרחיש 3: הקדמת מס מיותרת")
+    st.write(f"הפעולה תגרור תשלום מס מיידי במזומן של **₪{total_tax_today:,.2f}**. הוצאת נזילות מהתיק פוגעת אנושות באפקט הריבית דריבית.")
+
+elif total_usd_profit_today <= 0:
+    st.info("#### 📉 תרחיש 4/5: השמדת ערך או אשליית מטבע")
+    st.write("הנכס נמצא בהפסד דולרי. ביצוע איפוס עכשיו מהווה הורדת בסיס (Step-Down). אסטרטגיה זו כדאית אך ורק במקרה של 'מכירה רעיונית' שבה מנצלים את ההפסד המוכר לקיזוז מיידי מול נכסים מורווחים אחרים בתיק.")
+
+# --- STAGE 2: FUTURE PROJECTIONS ANALYSIS (THE BREAKEVEN LOGIC) ---
+st.markdown("---")
+st.markdown("#### 🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)")
+
+# Re-use the existing breakeven logic, now presented as an additional layer of validation
+if total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0:
+    # Specific forward-looking analysis for Scenario 2 (The Trade-Off)
+    if len(scenario_b_net) > 0 and len(scenario_a_net) > 0 and scenario_b_net[-1] > scenario_a_net[-1]:
+         st.success("**שבירת המלכודת:** מנוע התחזיות קובע שעל אף שאתה שורף מגן מס שקלי היום, תחזית העלייה של הדולר שהזנת מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה **מנצחת את חלופת ה-HOLD** לאורך תקופת ההשקעה.")
+    else:
+         st.error("**השמדת ערך ודאית:** מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.")
 
 elif breakeven_year:
     if breakeven_year == 1:
-        st.error(
-            f"**Warning:** Resetting the tax base is **not profitable**. Under your {expected_return}% return projection, the tax paid today permanently cripples your compound interest. 'HOLD' wins immediately.")
+        st.error(f"אזהרה חמורה: תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.")
     else:
-        st.warning(
-            f"**Time-Sensitive Strategy:** Resetting today is profitable ONLY IF you sell within the next **{breakeven_year - 1} years**. \n\nFrom **Year {breakeven_year}** onwards, the 'HOLD' strategy wins because the compound interest lost on the tax paid today exceeds your future tax savings.")
-
+        st.warning(f"**חלון זמנים מוגבל (Time-Sensitive):** האסטרטגיה רווחית אך ורק אם תמשוך את הכסף ב-**{breakeven_year - 1} השנים הקרובות**. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.")
 else:
-    st.success(
-        f"**Strategy Validated:** Within your {investment_horizon}-year horizon, the Tax Base Step-Up remains highly profitable. The tax savings outweigh the lost compound interest for the entire projected period.")
+    if total_tax_today > 0 or total_usd_profit_today <= 0:
+        st.success(f"למרות החיסכון במס, על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון להחזקה (HOLD) או כדאיות רק תחת שיקולי קיזוז חיצוניים.")
+    else:
+        st.success(f"**אסטרטגיה מנצחת:** על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת. החיסכון במס ממקסם את הוצאת הכספים במועד המשיכה הסופי.")
 
 # Actionable Disclaimer Box
 disclaimer_items = [
