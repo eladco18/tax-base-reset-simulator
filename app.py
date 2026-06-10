@@ -293,6 +293,17 @@ st.markdown(
     '<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; color: #004085; text-align: right; font-family: sans-serif; margin-bottom: 15px; border: 1px solid #b8daff;">💡 <b>המלצת מערכת (Best Practice):</b> ודאו ש"סך יחידות פתוחות" תואם במדויק ליתרה המופיעה בחשבון הברוקר או הבנק שלכם.</div>',
     unsafe_allow_html=True)
 
+# Reset checkbox if ledger changes
+current_ledger_hash = hash(edited_df.to_json())
+
+if 'ledger_hash' not in st.session_state:
+    st.session_state['ledger_hash'] = current_ledger_hash
+    st.session_state['sanity_checked'] = False
+
+if current_ledger_hash != st.session_state['ledger_hash']:
+    st.session_state['sanity_checked'] = False
+    st.session_state['ledger_hash'] = current_ledger_hash
+
 # CENTERED CHECKBOX COMPONENT VIA COLUMNS
 st.markdown("<br>", unsafe_allow_html=True)
 col_l, col_center, col_r = st.columns([1, 2, 1])
@@ -301,7 +312,7 @@ with col_center:
 
 if not sanity_verified:
     st.markdown(
-        '<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; font-family: sans-serif; border: 1px solid #ffeeba;">🔒 אנא אשרו את הנתונים בתיבת הסימון מעלה כדי לפתוח את מנוע המס ואת האסטרטגיה הפיננסית.</div>',
+        '<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; font-family: sans-serif; border: 1px solid #ffeeba;">🔒 אנא אשרו את הנתונים בתיבת הסימון מעלה כדי לפתוח את מנוע המס ואת ניתוח האסטרטגיה.</div>',
         unsafe_allow_html=True)
     st.stop()
 elif total_units_remaining <= 0:
@@ -344,6 +355,10 @@ col_t1, col_t2, col_t3 = st.columns(3)
 col_t3.metric("סה״כ רווח חייב במס", f"₪{tot_taxable:,.2f}")
 col_t2.metric("סה״כ הפסד הון מוכר (מוזס)", f"₪{tot_loss:,.2f}")
 
+# UI/UX: Smart Tooltip calculating the Gross Loss representing the Burned Shield
+gross_burned = total_burned_shield / 0.25 if total_burned_shield > 0 else 0
+help_text = f"מייצג את שווי המס האמיתי (25%) מתוך הפסד נומינלי גולמי של ₪{gross_burned:,.2f}. ביצוע איפוס מס (Step-Up) כעת ימחק הפסד זה ולא יאפשר לקזז אותו מול רווחים עתידיים."
+
 # Display the burned shield metric visually
 if total_burned_shield > 0:
     col_t1.metric("🔥 מגן מס (מזומן) שנשרף", f"₪{total_burned_shield:,.2f}", delta="קנס הורדת בסיס (Step-Down)",
@@ -357,10 +372,9 @@ st.markdown(
 st.markdown("<br>", unsafe_allow_html=True)
 
 # Warning callout right under the tax liability if shield is burned
+# Warning callout right under the tax liability if shield is burned
 if total_tax_today == 0 and total_burned_shield > 0:
-    st.markdown(
-        f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>⚠️ שים לב:</b> תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של <b>₪{total_burned_shield:,.2f}</b>. המשיכו לגרף מטה כדי לבדוק אם אובדן זה משתלם אל מול התחזיות העתידיות שלכם.</div>',
-        unsafe_allow_html=True)
+    st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>⚠️ שים לב:</b> תשלום המס היום הוא אכן אפס, אך במחיר של שריפת מגן מס בשווי מזומן של <b>₪{total_burned_shield:,.2f}</b>. במצב זה, מידת הכדאיות תלויה לחלוטין בהתפתחות העתידית של שער הדולר וערך המניה. המשיכו לגרף מטה לניתוח שובר שוויון (Breakeven).</div>', unsafe_allow_html=True)
 
 # --- MODULE 5: CFO STRATEGY (BREAKEVEN) ---
 st.markdown("---")
@@ -404,7 +418,6 @@ for i in range(len(years)):
 
 fig2 = go.Figure()
 
-# REVERTED GRAPH 2 LEGENDS AND TITLES TO ENGLISH AS REQUESTED
 fig2.add_trace(go.Scatter(
     x=years,
     y=scenario_a_net,
@@ -463,7 +476,7 @@ if total_tax_today == 0 and total_usd_profit_today > 0:
 
 elif total_tax_today > 0 and total_usd_profit_today > 0:
     st.markdown(
-        f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><h4 style="margin-top: 0;">🛑 תרחיש 3: הקדמת מס מיותרת</h4>הפעולה תגרור תשלום מס מיידי במזומן של <b>₪{total_tax_today:,.2f}</b>. הוצאת נזילות מהתיק פוגעת אנושות באפקט הריבית דריבית.</div>',
+        f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><h4 style="margin-top: 0;">🛑 תרחיש 3: הקדמת מס מיותרת</h4>הפעולה תגרור תשלום מס מיידי במזומן של <b>₪{total_tax_today:,.2f}</b>. הוצאת נזילות מהתיק פוגעת באפקט הריבית דריבית.</div>',
         unsafe_allow_html=True)
 
 elif total_usd_profit_today <= 0:
@@ -485,12 +498,12 @@ if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
         if step_up_wins_end:
              st.markdown('<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>שבירת המלכודת:</b> מנוע התחזיות קובע שעל אף שאתם שורפים מגן מס שקלי היום, תחזית העלייה של הדולר שהזנתם מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה <b>מנצחת את חלופת ה-HOLD</b> לאורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
         else:
-             st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.</div>', unsafe_allow_html=True)
+             st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח.</div>', unsafe_allow_html=True)
 
     elif breakeven_year:
         # There is a crossover point!
         if breakeven_year == 1:
-            st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה חמורה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>', unsafe_allow_html=True)
+            st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תמשכו את הכסף ב-<b>{breakeven_year - 1} השנים הקרובות</b>. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
 
