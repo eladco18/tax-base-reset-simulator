@@ -209,7 +209,7 @@ st.markdown(
 st.write("")  # Spacer
 
 # REVERTED INPUT LEDGER TABLE TO ENGLISH AS REQUESTED
-default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Price ($)", "Rate (₪/$)"])
+default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Unit Price ($)", "Rate (₪/$)"])
 edited_df = st.data_editor(
     default_ledger,
     num_rows="dynamic",
@@ -281,7 +281,7 @@ total_usd_value = total_units_remaining * current_price
 total_ils_value = total_usd_value * current_rate
 
 col1, col2, col3 = st.columns(3)
-col3.metric("סך יחידות פתוחות", f"{total_units_remaining:,.4f}")
+col3.metric("סך יחידות פתוחות", f"{total_units_remaining:,.2f}")
 col2.metric("שווי נוכחי כולל ($)", f"${total_usd_value:,.2f}")
 col1.metric("שווי נוכחי כולל (₪)", f"₪{total_ils_value:,.2f}")
 
@@ -321,16 +321,20 @@ res_df = pd.DataFrame(lot_results)
 
 # REVERTED OUTPUT TABLE HEADERS TO ENGLISH AS REQUESTED (LEFT-TO-RIGHT)
 with st.expander("🔍 צפו בפירוט שכבות המס (Advanced Tax Lot Breakdown)", expanded=True):
+    numeric_cols = ["Rem. Units", "USD Profit ($)", "Nominal ILS (₪)", "Taxable Profit (₪)", "Recognized Loss (₪)",
+                    "Lost Cash Shield (₪)"]
+    cols_to_format = [col for col in numeric_cols if col in res_df.columns]
+
     def highlight_burned(val):
         color = '#ffcccc' if isinstance(val, (int, float)) and val > 0 else ''
         return f'background-color: {color}'
 
+    styled_df = res_df.style.format({col: "{:,.2f}" for col in cols_to_format})
 
     if "Lost Cash Shield (₪)" in res_df.columns:
-        styled_df = res_df.style.map(highlight_burned, subset=["Lost Cash Shield (₪)"])
-        st.dataframe(styled_df, use_container_width=True)
-    else:
-        st.dataframe(res_df, use_container_width=True)
+        styled_df = styled_df.map(highlight_burned, subset=["Lost Cash Shield (₪)"])
+
+    st.dataframe(styled_df, use_container_width=True)
 
 col_t1, col_t2, col_t3 = st.columns(3)
 col_t3.metric("סה״כ רווח חייב במס", f"₪{tot_taxable:,.2f}")

@@ -47,12 +47,12 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
         lot_results.append({
             "Lot #": index + 1,
             "Orig. Date": lot.get("Date", "N/A"),
-            "Rem. Units": round(units, 4),
+            "Rem. Units": round(units, 2),
             "USD Profit ($)": round(usd_profit, 2),
             "Nominal ILS (₪)": round(nominal_ils_profit, 2),
             "Taxable Profit (₪)": round(taxable_profit, 2),
             "Recognized Loss (₪)": round(recognized_loss, 2),
-            "Lost Cash Shield (₪)": round(burned_shield_cash, 2)  # UI-friendly label
+            "Lost Cash Shield (₪)": round(burned_shield_cash, 2)
         })
 
     # Netting and final liability
