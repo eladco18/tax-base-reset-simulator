@@ -150,7 +150,7 @@ except FileNotFoundError:
 st.markdown("<h2 dir='rtl' style='text-align: right;'>1. מבט מאקרו: פוטנציאל מגן המס ההיסטורי</h2>",
             unsafe_allow_html=True)
 st.markdown(
-    '<div dir="rtl" style="text-align: right; margin-bottom: 15px;">גרף זה מציג את החוזק ההיסטורי של הדולר מול השקל בהשוואה לשער של היום. שער היסטורי גבוה יותר מתורגם לפוטנציאל גבוה יותר של מגן מס היום, ללא תלות בנכס ספציפי.</div>',
+    '<div dir="rtl" style="text-align: right; margin-bottom: 15px;">גרף זה מציג את החוזק ההיסטורי של הדולר מול השקל בהשוואה לשער של היום. שער היסטורי גבוה יותר מתורגם לפוטנציאל גבוה יותר של בסיס מס דולרי היום, ללא תלות בנכס ספציפי.</div>',
     unsafe_allow_html=True)
 
 # Custom RTL Label for the Date Input
