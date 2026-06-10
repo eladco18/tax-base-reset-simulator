@@ -287,8 +287,9 @@ st.markdown(
     '<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; color: #004085; text-align: right; font-family: sans-serif; margin-bottom: 15px; border: 1px solid #b8daff;">💡 <b>המלצת מערכת (Best Practice):</b> ודאו ש"סך יחידות פתוחות" תואם במדויק ליתרה המופיעה בחשבון הברוקר או הבנק שלכם.</div>',
     unsafe_allow_html=True)
 
-# Reset checkbox if ledger changes
-current_ledger_hash = hash(edited_df.to_json())
+# Reset checkbox if ledger or ticker changes
+current_ledger_hash = hash(ticker_input +edited_df.fillna("").to_json(date_format="iso"))
+
 
 if 'ledger_hash' not in st.session_state:
     st.session_state['ledger_hash'] = current_ledger_hash
@@ -302,7 +303,7 @@ if current_ledger_hash != st.session_state['ledger_hash']:
 st.markdown("<br>", unsafe_allow_html=True)
 col_l, col_center, col_r = st.columns([1, 2, 1])
 with col_center:
-    sanity_verified = st.checkbox("אני מאשר/ת שהנתונים משקפים במדויק את התיק הנוכחי שלי.")
+    sanity_verified = st.checkbox("אני מאשר/ת שהנתונים משקפים במדויק את התיק הנוכחי שלי.", key="sanity_checked")
 
 if not sanity_verified:
     st.markdown(
@@ -348,10 +349,6 @@ with st.expander("🔍 צפו בפירוט שכבות המס (Advanced Tax Lot B
 col_t1, col_t2, col_t3 = st.columns(3)
 col_t3.metric("סה״כ רווח חייב במס", f"₪{tot_taxable:,.2f}")
 col_t2.metric("סה״כ הפסד הון מוכר (מוזס)", f"₪{tot_loss:,.2f}")
-
-# UI/UX: Smart Tooltip calculating the Gross Loss representing the Burned Shield
-gross_burned = total_burned_shield / 0.25 if total_burned_shield > 0 else 0
-help_text = f"מייצג את שווי המס האמיתי (25%) מתוך הפסד נומינלי גולמי של ₪{gross_burned:,.2f}. ביצוע איפוס מס (Step-Up) כעת ימחק הפסד זה ולא יאפשר לקזז אותו מול רווחים עתידיים."
 
 # Display the burned shield metric visually
 if total_burned_shield > 0:
