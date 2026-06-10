@@ -127,18 +127,22 @@ st.markdown(
     '<div dir="rtl" style="text-align: right; font-size: 1.1rem; margin-bottom: 20px;">הערכת הכדאיות הכלכלית של אסטרטגיית <b>"העלאת בסיס מס" (Tax Base Step-Up)</b> בהתאם לסעיף 91(ב) לפקודת מס הכנסה.</div>',
     unsafe_allow_html=True)
 
-# --- PDF DOWNLOAD BUTTON (CENTERED VIA CSS) ---
+# --- PDF DOWNLOAD BUTTON (CENTERED VIA COLUMNS) ---
 try:
     with open("Guide.pdf", "rb") as pdf_file:
         pdf_bytes = pdf_file.read()
 
-    st.download_button(
-        label="📄 להורדת המדריך האסטרטגי המלא (PDF)",
-        data=pdf_bytes,
-        file_name="Tax_Base_Step-Up_Guide.pdf",
-        mime="application/pdf",
-        help="מומלץ מאוד לקרוא מדריך מקיף זה בטרם קבלת החלטות מס או ביצוע פעולות בחשבון ההשקעות שלכם.\u200F"
-    )
+    # Using 3 columns to perfectly center the button
+    col_l, col_center, col_r = st.columns([1, 2, 1])
+    with col_center:
+        st.download_button(
+            label="📄 להורדת המדריך האסטרטגי המלא (PDF)",
+            data=pdf_bytes,
+            file_name="Tax_Base_Step-Up_Guide.pdf",
+            mime="application/pdf",
+            help="מומלץ מאוד לקרוא מדריך מקיף זה בטרם קבלת החלטות מס או ביצוע פעולות בחשבון ההשקעות שלכם.\u200F",
+            use_container_width=True
+        )
 except FileNotFoundError:
     pass
 
@@ -285,8 +289,11 @@ st.markdown(
     '<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; color: #004085; text-align: right; font-family: sans-serif; margin-bottom: 15px; border: 1px solid #b8daff;">💡 <b>המלצת מערכת (Best Practice):</b> ודאו ש"סך יחידות פתוחות" תואם במדויק ליתרה המופיעה בחשבון הברוקר או הבנק שלכם.</div>',
     unsafe_allow_html=True)
 
-# CENTERED CHECKBOX COMPONENT VIA GLOBAL CSS
-sanity_verified = st.checkbox("אני מאשר/ת שהנתונים משקפים במדויק את התיק הנוכחי שלי.")
+# CENTERED CHECKBOX COMPONENT VIA COLUMNS
+st.markdown("<br>", unsafe_allow_html=True)
+col_l, col_center, col_r = st.columns([1, 2, 1])
+with col_center:
+    sanity_verified = st.checkbox("אני מאשר/ת שהנתונים משקפים במדויק את התיק הנוכחי שלי.")
 
 if not sanity_verified:
     st.markdown(
@@ -459,37 +466,32 @@ elif total_usd_profit_today <= 0:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- STAGE 2: FUTURE PROJECTIONS ANALYSIS (THE BREAKEVEN LOGIC) ---
-st.markdown("<h4 dir='rtl' style='text-align: right;'>🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)</h4>",
-            unsafe_allow_html=True)
+st.markdown("<h4 dir='rtl' style='text-align: right;'>🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)</h4>", unsafe_allow_html=True)
 
-if total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0:
-    if len(scenario_b_net) > 0 and len(scenario_a_net) > 0 and scenario_b_net[-1] > scenario_a_net[-1]:
-        st.markdown(
-            '<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>שבירת המלכודת:</b> מנוע התחזיות קובע שעל אף שאתם שורפים מגן מס שקלי היום, תחזית העלייה של הדולר שהזנתם מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה <b>מנצחת את חלופת ה-HOLD</b> לאורך תקופת ההשקעה.</div>',
-            unsafe_allow_html=True)
-    else:
-        st.markdown(
-            '<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.</div>',
-            unsafe_allow_html=True)
+if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
+    # Mathematical proof: who wins in the final year?
+    step_up_wins_end = scenario_b_net[-1] > scenario_a_net[-1]
 
-elif breakeven_year:
-    if breakeven_year == 1:
-        st.markdown(
-            f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה חמורה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>',
-            unsafe_allow_html=True)
+    if total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0:
+        # Scenario 2 (Trade-off) specific text
+        if step_up_wins_end:
+             st.markdown('<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>שבירת המלכודת:</b> מנוע התחזיות קובע שעל אף שאתם שורפים מגן מס שקלי היום, תחזית העלייה של הדולר שהזנתם מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה <b>מנצחת את חלופת ה-HOLD</b> לאורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
+        else:
+             st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח בענק.</div>', unsafe_allow_html=True)
+
+    elif breakeven_year:
+        # There is a crossover point!
+        if breakeven_year == 1:
+            st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה חמורה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תמשכו את הכסף ב-<b>{breakeven_year - 1} השנים הקרובות</b>. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
+
     else:
-        st.markdown(
-            f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תמשכו את הכסף ב-<b>{breakeven_year - 1} השנים הקרובות</b>. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>',
-            unsafe_allow_html=True)
-else:
-    if total_tax_today > 0 or total_usd_profit_today <= 0:
-        st.markdown(
-            f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;">למרות החיסכון במס, על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון להחזקה (HOLD) או כדאיות רק תחת שיקולי קיזוז חיצוניים.</div>',
-            unsafe_allow_html=True)
-    else:
-        st.markdown(
-            f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת. החיסכון במס ממקסם את הוצאת הכספים במועד המשיכה הסופי.</div>',
-            unsafe_allow_html=True)
+        # No crossover at all. One line is strictly above the other.
+        if step_up_wins_end:
+            st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין. מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;">על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD). תשלום המס / עמלות היום אינו משתלם כלכלית (או כדאי רק תחת שיקולי קיזוז חיצוניים).</div>', unsafe_allow_html=True)
 
 # Actionable Disclaimer Box
 st.markdown("---")
