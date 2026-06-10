@@ -201,13 +201,19 @@ st.markdown("<h2 dir='rtl' style='text-align: right;'>2. יומן העסקאות
 st.markdown(
     f'<div dir="rtl" style="text-align: right; margin-bottom: 15px;">הזינו את היסטוריית הרכישות והמכירות שלכם עבור <b>{ticker_input}</b>. המערכת תחשב את שכבות המס הפתוחות (Tax Lots) בתיק שלכם על בסיס שיטת ה-<b>FIFO</b> (נכנס ראשון, יוצא ראשון).</div>',
     unsafe_allow_html=True)
-
+'''
 # --- Contextual Market Snapshot ---
 st.markdown(
     f'<div dir="rtl" style="background-color: #e8f4f8; padding: 10px; border-radius: 5px; color: #004085; text-align: right; border: 1px solid #b8daff;">📌 <b>נכס:</b> <b>{ticker_input}</b> &nbsp;|&nbsp; <b>מחיר:</b> <b>${current_price:,.2f}</b> &nbsp;|&nbsp; <b>שער דולר/שקל:</b> <b>₪{current_rate:,.4f}</b></div>',
     unsafe_allow_html=True)
 st.write("")  # Spacer
-
+'''
+# --- Contextual Market Snapshot ---
+st.info(
+    f"📌 **Asset:** **{ticker_input}** &nbsp;|&nbsp; "
+    f"**Price:** **${current_price:,.2f}** &nbsp;|&nbsp; "
+    f"**USD/ILS Rate:** **₪{current_rate:,.4f}**"
+)
 default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Unit Price ($)", "Rate (₪/$)"])
 edited_df = st.data_editor(
     default_ledger,
