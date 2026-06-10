@@ -208,7 +208,6 @@ st.markdown(
     unsafe_allow_html=True)
 st.write("")  # Spacer
 
-# REVERTED INPUT LEDGER TABLE TO ENGLISH AS REQUESTED
 default_ledger = pd.DataFrame(columns=["Date", "Action", "Units", "Unit Price ($)", "Rate (₪/$)"])
 edited_df = st.data_editor(
     default_ledger,
@@ -218,13 +217,13 @@ edited_df = st.data_editor(
         "Date": st.column_config.DateColumn("Date", required=True, max_value=datetime.today().date()),
         "Action": st.column_config.SelectboxColumn("Action", options=["Buy", "Sell"], required=True),
         "Units": st.column_config.NumberColumn("Units", min_value=0.001, required=True),
-        "Price ($)": st.column_config.NumberColumn("Price ($)", min_value=0.01, required=True),
+        "Unit Price ($)": st.column_config.NumberColumn("Unit Price ($)", min_value=0.01, required=True),
         "Rate (₪/$)": st.column_config.NumberColumn("Rate (₪/$) - Leave empty for Auto-Fill", min_value=1.0,
                                                     required=False),
     }
 )
 
-edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Price ($)"]).reset_index(drop=True)
+edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Unit Price ($)"]).reset_index(drop=True)
 
 # Chronological FIFO Algorithm with Stable Sort (English keys)
 edited_df['Action_Rank'] = edited_df['Action'].map({'Buy': 1, 'Sell': 2})
@@ -236,11 +235,10 @@ validation_error = False
 for _, row in edited_df.iterrows():
     action = row["Action"]
     units = row["Units"]
-    price = row["Price ($)"]
+    price = row["Unit Price ($)"]
     date = row["Date"]
-
-    # --- THE AUTO-FILL LOGIC ---
     rate = row["Rate (₪/$)"]
+    # --- AUTO-FILL LOGIC ---
     if pd.isna(rate) or rate <= 0:
         rate = get_historical_rate_for_date(date, df_ils_init, fallback_rate=current_rate)
     # ---------------------------
