@@ -28,8 +28,6 @@ st.markdown("""
     div[data-testid="stDownloadButton"] {
         display: flex;
         justify-content: flex-end;
-    }
-    div[data-testid="stDownloadButton"] button {
         direction: rtl;
     }
 
@@ -45,6 +43,26 @@ st.markdown("""
         text-align: right;
         display: block;
         font-weight: bold;
+    }
+
+    /* Force RTL on the Expander (Advanced Tax Lot Breakdown) */
+    div[data-testid="stExpander"] details summary {
+        direction: rtl;
+        text-align: right;
+    }
+    div[data-testid="stExpander"] details summary p {
+        direction: rtl;
+        text-align: right;
+        font-weight: bold;
+    }
+
+    /* Force RTL on the Sanity Checkbox */
+    div[data-testid="stCheckbox"] {
+        direction: rtl;
+        text-align: right;
+    }
+    div[data-testid="stCheckbox"] label {
+        direction: rtl;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -175,7 +193,7 @@ st.markdown(
     unsafe_allow_html=True)
 st.write("")  # Spacer
 
-default_ledger = pd.DataFrame(columns=["תאריך", "פעולה", "יחידות", "מחיר ($)", "שער (₪/$)"])
+default_ledger = pd.DataFrame(columns=["שער (₪/$)", "מחיר ($)", "יחידות", "פעולה", "תאריך"])
 edited_df = st.data_editor(
     default_ledger,
     num_rows="dynamic",
@@ -292,6 +310,10 @@ res_df.rename(columns={
     "Recognized Loss (₪)": "הפסד מוכר לקיזוז (₪)",
     "Lost Cash Shield (₪)": "מגן מס שנשרף (₪)"
 }, inplace=True)
+
+# Reverse the DataFrame columns to render beautifully Right-to-Left
+if not res_df.empty:
+    res_df = res_df.iloc[:, ::-1]
 
 with st.expander("🔍 צפו בפירוט שכבות המס (Advanced Tax Lot Breakdown)", expanded=True):
     def highlight_burned(val):
