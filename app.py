@@ -115,7 +115,7 @@ tg_key = st.secrets.get("TIINGO_API_KEY", "")
 with st.spinner("מאתחל נתוני שוק..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input, fh_key, tg_key)
 
-future_rate = st.sidebar.number_input("שער דולר/שקל עתידי צפוי", min_value=1.0, max_value=10.0,
+future_rate = st.sidebar.number_input("שער דולר/שקל עתידי צפוי בתום התקופה", min_value=1.0, max_value=10.0,
                                       value=3.5, step=0.1)
 
 # ==========================================
@@ -245,6 +245,9 @@ edited_df = st.data_editor(
 )
 
 edited_df = edited_df.dropna(subset=["Date", "Action", "Units", "Unit Price ($)"]).reset_index(drop=True)
+
+# Enforce datetime objects to prevent string errors in the ledger
+edited_df['Date'] = pd.to_datetime(edited_df['Date'])
 
 # Chronological FIFO Algorithm with Stable Sort (English keys)
 edited_df['Action_Rank'] = edited_df['Action'].map({'Buy': 1, 'Sell': 2})
