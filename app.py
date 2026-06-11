@@ -77,9 +77,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
+# RATE INITIALIZATION
+# ==========================================
+# 1. Deep History for Ledger Auto-Fill
+deep_history_start = "2000-01-01"
+df_ils_init = fetch_historical_exchange_rates(deep_history_start)
+# UI/UX: Ask for manual input if BOI is down or empty
+if df_ils_init.empty:
+    st.sidebar.markdown('<div dir="rtl" style="background-color: #fff3cd; padding: 10px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba; margin-bottom: 10px;">⚠️ <b>שגיאת תקשורת:</b> בנק ישראל אינו זמין כרגע. אנא הזינו שער דולר נוכחי ידנית:</div>', unsafe_allow_html=True)
+    current_rate = st.sidebar.number_input("שער דולר/שקל נוכחי למסחר", min_value=1.0, value=2.90, step=0.01)
+else:
+    current_rate = float(df_ils_init['Close'].iloc[-1])
+
+# ==========================================
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
-default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%Y-%m-%d')
+default_start = (datetime.today() - timedelta(days=365 * 3)).strftime('%Y-%m-%d')
 df_ils_init = fetch_historical_exchange_rates(default_start)
 current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
 
@@ -164,7 +177,7 @@ st.markdown(
 start_date = st.date_input(
     "",
     value=pd.to_datetime(default_start).date(),
-    min_value=datetime(1980, 1, 1).date(),
+    min_value=datetime(2000, 1, 1).date(),
     max_value=_today_il,
     label_visibility="collapsed"
 )

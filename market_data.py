@@ -2,6 +2,9 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta, timezone
 import streamlit as st
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 
 def _get_api_session() -> requests.Session:
     """
@@ -9,9 +12,6 @@ def _get_api_session() -> requests.Session:
     """
     session = requests.Session()
     session.headers.update({"Accept": "application/json"})
-
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
     adapter = HTTPAdapter(
         max_retries=Retry(
             total=3,
@@ -32,6 +32,7 @@ _BOI_SERIES_URL = (
     "dataflow/BOI.STATISTICS/EXR/1.0/RER_USD_ILS"
     "?startperiod={start}&endperiod={end}&format=sdmx-json&lang=en"
 )
+
 
 def _parse_boi_response(data: dict) -> pd.DataFrame:
     """Parses BOI SDMX-JSON into a timezone-naive DataFrame."""
@@ -58,6 +59,7 @@ def _parse_boi_response(data: dict) -> pd.DataFrame:
         return df
     except Exception as exc:
         raise ValueError(f"Unexpected BOI format: {exc}") from exc
+
 
 @st.cache_data(ttl=3600)
 def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
@@ -89,6 +91,7 @@ _FINNHUB_DIVS_URL = "https://finnhub.io/api/v1/stock/dividend2"
 _TIINGO_QUOTE_URL = "https://api.tiingo.com/iex/{symbol}"
 _TIINGO_META_URL = "https://api.tiingo.com/tiingo/daily/{symbol}"
 
+
 def _finnhub_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
     """Fetches price, currency, and dividend status from Finnhub."""
     params = {"token": key, "symbol": symbol}
@@ -117,6 +120,7 @@ def _finnhub_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
 
     return price, currency, pays_div
 
+
 def _tiingo_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
     """Fetches fallback data from Tiingo."""
     headers = {"Authorization": f"Token {key}"}
@@ -134,6 +138,7 @@ def _tiingo_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
     currency = (m_resp.json().get("currency") or "USD").upper()
 
     return price, currency, False
+
 
 @st.cache_data(ttl=3600)
 def fetch_asset_data(ticker_symbol: str, fh_key: str, tg_key: str):
@@ -161,7 +166,8 @@ def fetch_asset_data(ticker_symbol: str, fh_key: str, tg_key: str):
 
     return 0.0, "ERROR", False
 
-def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate: float) -> float:
+
+def get_historical_rate_for_date(target_date, df_history: pd.DataFrame, fallback_rate=None) -> float:
     """Finds the USD/ILS exchange rate for a specific past date, strictly handling timezones."""
     if df_history.empty:
         return fallback_rate
