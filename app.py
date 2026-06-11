@@ -79,7 +79,7 @@ st.markdown("""
 # ==========================================
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
-default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%Y-%m-%d')
+default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%d-%m-%Y')
 df_ils_init = fetch_historical_exchange_rates(default_start)
 current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
 
@@ -181,7 +181,7 @@ if start_date > _today_il:
     st.stop()
 
 with st.spinner("מושך נתוני מאקרו..."):
-    df_ils = fetch_historical_exchange_rates(start_date.strftime('%Y-%m-%d'))
+    df_ils = fetch_historical_exchange_rates(start_date.strftime('%d-%m-%Y'))
 
 if not df_ils.empty:
     df_ils['R_max_percent'] = ((df_ils['Close'] / current_rate) - 1) * 100
@@ -192,7 +192,7 @@ if not df_ils.empty:
         name="Potential Tax-Free USD Profit (%)",
         line=dict(color='#2ecc71', width=2.5),
         fill='tozeroy', fillcolor='rgba(46, 204, 113, 0.15)',
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Rate:</b> ₪%{customdata:.4f}<br><b>Max Tax-Free USD Return:</b> %{y:.2f}%<extra></extra>",
+        hovertemplate="<b>Date:</b> %{x|%d-%m-%Y}<br><b>Rate:</b> ₪%{customdata:.4f}<br><b>Max Tax-Free USD Return:</b> %{y:.2f}%<extra></extra>",
         customdata=df_ils['Close']
     ))
     fig1.add_hline(y=0, line_width=1.5, line_color="black", line_dash="dash")
@@ -275,7 +275,7 @@ for _, row in edited_df.iterrows():
 
         if units_to_sell > current_available:
             st.markdown(
-                f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;">🛑 <b>שגיאה כרונולוגית:</b> בתאריך {date.strftime("%Y-%m-%d")} הזנתם מכירה של {units_to_sell} יחידות, אך היתרה הזמינה באותו רגע עמדה על {current_available} יחידות בלבד. יתרות שליליות אינן חוקיות. אנא תקנו את היומן.</div>',
+                f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;">🛑 <b>שגיאה כרונולוגית:</b> בתאריך {date.strftime("%d-%m-%Y")} הזנתם מכירה של {units_to_sell} יחידות, אך היתרה הזמינה באותו רגע עמדה על {current_available} יחידות בלבד. יתרות שליליות אינן חוקיות. אנא תקנו את היומן.</div>',
                 unsafe_allow_html=True)
             validation_error = True
             break
@@ -352,6 +352,9 @@ total_tax_today, lot_results, tot_taxable, tot_loss, total_burned_shield = calcu
                                                                                                    current_rate)
 
 res_df = pd.DataFrame(lot_results)
+
+if "Orig. Date" in res_df.columns:
+    res_df["Orig. Date"] = pd.to_datetime(res_df["Orig. Date"]).dt.strftime("%d-%m-%Y")
 
 # REVERTED OUTPUT TABLE HEADERS TO ENGLISH AS REQUESTED (LEFT-TO-RIGHT)
 with st.expander("🔍 צפו בפירוט שכבות המס (Advanced Tax Lot Breakdown)", expanded=True):
