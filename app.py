@@ -79,7 +79,7 @@ st.markdown("""
 # ==========================================
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
-default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%d-%m-%Y')
+default_start = (datetime.today() - timedelta(days=365 * 5)).strftime('%Y-%m-%d')
 df_ils_init = fetch_historical_exchange_rates(default_start)
 current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
 
@@ -181,7 +181,7 @@ if start_date > _today_il:
     st.stop()
 
 with st.spinner("מושך נתוני מאקרו..."):
-    df_ils = fetch_historical_exchange_rates(start_date.strftime('%d-%m-%Y'))
+    df_ils = fetch_historical_exchange_rates(start_date.strftime('%Y-%m-%d'))
 
 if not df_ils.empty:
     df_ils['R_max_percent'] = ((df_ils['Close'] / current_rate) - 1) * 100
