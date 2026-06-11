@@ -92,7 +92,7 @@ if not re.match(r"^[A-Z0-9\-\.]+$", ticker_input):
         unsafe_allow_html=True)
     st.stop()
 
-st.sidebar.markdown("---")
+# st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 dir='rtl' style='text-align: right;'>💸 עלויות חיכוך</h3>", unsafe_allow_html=True)
 transaction_costs_usd = st.sidebar.number_input(
     "עמלות קנייה ומכירה ($)",
@@ -102,7 +102,7 @@ transaction_costs_usd = st.sidebar.number_input(
     help="סך כל עמלות הברוקר עבור פעולות המכירה והקנייה המיידית (לדוגמה: $5 למכירה + $5 לקנייה = $10 סך הכל). סכום זה יופחת מקרן ההשקעה הזמינה.\u200F"
 )
 
-st.sidebar.markdown("---")
+# st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 dir='rtl' style='text-align: right;'>🔮 תחזיות לעתיד</h3>", unsafe_allow_html=True)
 expected_return = st.sidebar.number_input("תשואה שנתית צפויה (%)", min_value=-100.0, max_value=100.0, value=5.0,
                                           step=0.5)
