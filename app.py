@@ -273,9 +273,38 @@ for _, row in edited_df.iterrows():
     price = row["Unit Price ($)"]
     date = row["Date"]
     rate = row["Rate (₪/$)"]
+
     # --- AUTO-FILL LOGIC ---
     if pd.isna(rate) or rate <= 0:
-        rate = get_historical_rate_for_date(date, df_ils_init, fallback_rate=current_rate)
+
+        # 1. Guard Check: Is the date before our deep history?
+        if date < pd.to_datetime(deep_history_start):
+            formatted_date = date.strftime("%d.%m.%Y") if hasattr(date, "strftime") else str(date)[:10]
+
+            # Extract year and formatted string dynamically from the global setting
+            deep_dt = pd.to_datetime(deep_history_start)
+            dynamic_year = deep_dt.year
+            dynamic_date_str = deep_dt.strftime("%d.%m.%Y")
+
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba; margin-bottom: 10px;">⏳ <b>היסטוריה רחוקה:</b> התאריך {formatted_date} קודם לשנת {dynamic_year}. מאגר המידע האוטומטי שלנו מול בנק ישראל מוגדר החל מ-{dynamic_date_str}. כדי להמשיך בסימולציה, אנא הזינו את השער היציג מאותו יום <b>ידנית</b> בעמודת ה-"Rate".</div>',
+                unsafe_allow_html=True)
+            validation_error = True
+            break
+
+        # 2. If it's inside the timeframe, try fetching normally (NO fallback rate)
+        fetched_rate = get_historical_rate_for_date(date, df_ils_init, fallback_rate=None)
+
+        if fetched_rate is None:
+            # The BOI failed or returned empty for a valid date
+            formatted_date = date.strftime("%d.%m.%Y") if hasattr(date, "strftime") else str(date)[:10]
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb; margin-bottom: 10px;">🛑 <b>שגיאת שליפת שער:</b> תקלה זמנית מנעה משיכה אוטומטית של שער הדולר עבור התאריך {formatted_date}. אנא הזינו את השער <b>ידנית</b> תחת עמודת "Rate" בטבלת העסקאות.</div>',
+                unsafe_allow_html=True)
+            validation_error = True
+            break
+        else:
+            rate = fetched_rate
     # ---------------------------
 
     if action == "Buy":
