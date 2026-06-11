@@ -93,8 +93,6 @@ else:
 # SIDEBAR: GLOBAL SETTINGS
 # ==========================================
 default_start = (datetime.today() - timedelta(days=365 * 3)).strftime('%Y-%m-%d')
-df_ils_init = fetch_historical_exchange_rates(default_start)
-current_rate = float(df_ils_init['Close'].iloc[-1]) if not df_ils_init.empty else 3.60
 
 st.sidebar.markdown("<h2 dir='rtl' style='text-align: right;'>⚙️ הגדרות כלליות</h2>", unsafe_allow_html=True)
 ticker_input = st.sidebar.text_input("סימול נכס (לדוגמה: SPY, QQQ)", value="SPY").upper()
