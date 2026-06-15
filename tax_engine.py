@@ -36,9 +36,18 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
             burned_shield_cash = unrecognized_nominal_loss * tax_rate
 
         # Scenario C: Step-Down Trap (USD Profit, ILS Loss)
-        elif usd_profit > 0 and nominal_ils_profit < 0:
+        elif usd_profit > 0 > nominal_ils_profit:
             # The entire nominal loss is unrecognized. Convert to lost cash tax shield.
             burned_shield_cash = abs(nominal_ils_profit) * tax_rate
+
+        # Scenario D: Phantom Profit (USD Loss, ILS Profit)
+        elif usd_profit < 0 < nominal_ils_profit:
+            # Legal Status: No real profit -> Tax is 0.
+            # No nominal loss -> Recognized loss is 0.
+            # No tax shield is burned (the investor was protected from paying nominal tax).
+            taxable_profit = 0.0
+            recognized_loss = 0.0
+            burned_shield_cash = 0.0
 
         total_taxable_profit += taxable_profit
         total_recognized_loss += recognized_loss

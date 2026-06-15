@@ -1,10 +1,10 @@
 import re
-import time
 from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from pathlib import Path
 
 # Import custom modules (Architecture Split)
 from market_data import fetch_historical_exchange_rates, fetch_asset_data, get_historical_rate_for_date
@@ -140,7 +140,9 @@ st.markdown(
 
 # --- PDF DOWNLOAD BUTTON (CENTERED VIA COLUMNS) ---
 try:
-    with open("Guide.pdf", "rb") as pdf_file:
+    # Secure cloud deployment pathing
+    pdf_path = Path(__file__).parent / "Guide.pdf"
+    with open(pdf_path, "rb") as pdf_file:
         pdf_bytes = pdf_file.read()
 
     # Using 3 columns to perfectly center the button
@@ -231,7 +233,7 @@ st.markdown("---")
 st.markdown("<h2 dir='rtl' style='text-align: right;'>2. יומן העסקאות: היסטוריית פעולות (Ledger)</h2>",
             unsafe_allow_html=True)
 st.markdown(
-    f'<div dir="rtl" style="text-align: right; margin-bottom: 15px;">הזינו את היסטוריית הרכישות והמכירות שלכם עבור <b>{ticker_input}</b>. המערכת תחשב את שכבות המס הפתוחות (Tax Lots) בתיק שלכם על בסיס שיטת ה-<b>FIFO</b> (נכנס ראשון, יוצא ראשון).</div>',
+    f'<div dir="rtl" style="text-align: right; margin-bottom: 15px;">הזינו את היסטוריית הרכישות והמכירות שלכם עבור <b>{ticker_input}</b>. המערכת תחשב את שכבות המס הפתוחות (Tax Lots) בתיק שלכם על בסיס שיטת ה-<b>FIFO</b> (נכנס ראשון, יוצא ראשון).<br><span style="color: #c0392b; font-size: 0.9em;"><b>* הערת ספליטים (פיצול מניות):</b> אם הנכס עבר פיצול לאחר הרכישה, יש להזין את הכמויות ומחירי הקנייה ההיסטוריים <b>לאחר תיאום (Adjusted)</b> כדי למנוע שגיאות של יתרה שלילית.</span></div>',
     unsafe_allow_html=True)
 
 # --- Contextual Market Snapshot ---
@@ -455,16 +457,21 @@ new_units = new_usd_base / current_price
 reset_lot = [{"Units": new_units, "Price": current_price, "Rate": current_rate}]
 
 for y in years:
+    # 1. Price projection (Compound Interest)
     future_price_y = current_price * ((1 + (expected_return / 100)) ** y)
 
-    # Scenario A projection
-    tax_a, _, _, _, _ = calculate_portfolio_tax(open_lots, future_price_y, future_rate)
-    gross_ils_a = total_units_remaining * future_price_y * future_rate
+    # 2. Rate projection (Linear Interpolation)
+    # The rate climbs gradually from current_rate to future_rate over the investment horizon
+    interpolated_rate_y = current_rate + ((future_rate - current_rate) * (y / investment_horizon))
+
+    # Scenario A projection (HOLD)
+    tax_a, _, _, _, _ = calculate_portfolio_tax(open_lots, future_price_y, interpolated_rate_y)
+    gross_ils_a = total_units_remaining * future_price_y * interpolated_rate_y
     scenario_a_net.append(gross_ils_a - tax_a)
 
-    # Scenario B projection
-    tax_b, _, _, _, _ = calculate_portfolio_tax(reset_lot, future_price_y, future_rate)
-    gross_ils_b = new_units * future_price_y * future_rate
+    # Scenario B projection (Tax Base Step-Up)
+    tax_b, _, _, _, _ = calculate_portfolio_tax(reset_lot, future_price_y, interpolated_rate_y)
+    gross_ils_b = new_units * future_price_y * interpolated_rate_y
     scenario_b_net.append(gross_ils_b - tax_b)
 
 # Find Breakeven
