@@ -62,24 +62,32 @@ def _parse_boi_response(data: dict) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)
-def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
-    """Fetches historical USD/ILS rates from the Bank of Israel."""
-    end_date = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+def _fetch_boi_cached(start_date: str, end_date: str) -> pd.DataFrame:
+    """Internal cached fetcher. Raises exceptions to prevent caching empty data."""
     url = _BOI_SERIES_URL.format(start=start_date, end=end_date)
+    resp = _SESSION.get(url, timeout=15)
 
+    if resp.status_code == 429:
+        raise ConnectionError("BOI API rate limit reached.")
+    if resp.status_code != 200:
+        raise ConnectionError(f"BOI API error ({resp.status_code}).")
+
+    df = _parse_boi_response(resp.json())
+    if df.empty:
+        raise ValueError("BOI API returned empty data.")
+
+    return df
+
+
+def fetch_historical_exchange_rates(start_date: str) -> pd.DataFrame:
+    """Fetches historical USD/ILS rates safely with cache poisoning prevention."""
+    end_date = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
     try:
-        resp = _SESSION.get(url, timeout=15)
-        if resp.status_code == 429:
-            st.error("⚠️ BOI API rate limit reached.")
-            return pd.DataFrame()
-        if resp.status_code != 200:
-            st.error(f"⚠️ BOI API error ({resp.status_code}).")
-            return pd.DataFrame()
-
-        return _parse_boi_response(resp.json())
-
+        # Streamlit only caches successful returns. Exceptions bypass the cache.
+        return _fetch_boi_cached(start_date, end_date)
     except Exception as exc:
-        st.error(f"⚠️ BOI Error: {exc}")
+        # We silently log/warn, and return an empty DF for the app to handle gracefully
+        st.warning(f"⚠️ BOI Network Error: {exc}")
         return pd.DataFrame()
 
 
@@ -140,6 +148,13 @@ def _tiingo_fetch(symbol: str, key: str) -> tuple[float, str, bool]:
     return price, currency, False
 
 
+def _safe_error_message(exc: Exception, key: str) -> str:
+    """Sanitizes error messages to prevent API key leakage."""
+    msg = str(exc)
+    if key and key in msg:
+        msg = msg.replace(key, "***REDACTED***")
+    return msg
+
 @st.cache_data(ttl=3600)
 def fetch_asset_data(ticker_symbol: str, fh_key: str, tg_key: str):
     """
@@ -156,13 +171,13 @@ def fetch_asset_data(ticker_symbol: str, fh_key: str, tg_key: str):
         try:
             return _finnhub_fetch(symbol, fh_key)
         except Exception as e:
-            st.warning(f"⚠️ Finnhub error: {e}. Trying fallback...")
+            st.warning(f"⚠️ Finnhub error: {_safe_error_message(e, fh_key)}. Trying fallback...")
 
     if tg_key:
         try:
             return _tiingo_fetch(symbol, tg_key)
         except Exception as e:
-            st.error(f"🚨 Tiingo error: {e}")
+            st.error(f"🚨 Tiingo error: {_safe_error_message(e, tg_key)}")
 
     return 0.0, "ERROR", False
 

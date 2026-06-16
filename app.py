@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from pathlib import Path
+import hashlib
 
 # Import custom modules (Architecture Split)
 from market_data import fetch_historical_exchange_rates, fetch_asset_data, get_historical_rate_for_date
@@ -125,6 +126,16 @@ tg_key = st.secrets.get("TIINGO_API_KEY", "")
 
 with st.spinner("מאתחל נתוני שוק..."):
     current_price, asset_currency, pays_dividend = fetch_asset_data(ticker_input, fh_key, tg_key)
+
+# Prevent division by zero and phantom calculations if API fails
+if current_price <= 0 or asset_currency == "ERROR":
+    st.sidebar.markdown(
+        '<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; '
+        'color: #721c24; text-align: right; border: 1px solid #f5c6cb; font-family: sans-serif; margin-bottom: 10px;">'
+        f'🛑 <b>שגיאת נתוני שוק קריטית:</b> לא ניתן לאחזר מחיר עדכני עבור <b>{ticker_input}</b> '
+        'משרתי הבורסה. אנא ודאו שהסימול חוקי, או נסו שוב מאוחר יותר.'
+        '</div>', unsafe_allow_html=True)
+    st.stop()
 
 future_rate = st.sidebar.number_input("שער דולר/שקל עתידי צפוי בתום התקופה", min_value=1.0, max_value=10.0,
                                       value=3.5, step=0.1)
@@ -247,6 +258,7 @@ edited_df = st.data_editor(
     default_ledger,
     num_rows="dynamic",
     use_container_width=True,
+    key=f"ledger_editor_{ticker_input}",
     column_config={
         "Date": st.column_config.DateColumn("Date", required=True, max_value=datetime.today().date()),
         "Action": st.column_config.SelectboxColumn("Action", options=["Buy", "Sell"], required=True),
@@ -269,12 +281,13 @@ edited_df = edited_df.sort_values(by=["Date", "Action_Rank"]).reset_index(drop=T
 open_lots = []
 validation_error = False
 
-for _, row in edited_df.iterrows():
-    action = row["Action"]
-    units = row["Units"]
-    price = row["Unit Price ($)"]
-    date = row["Date"]
-    rate = row["Rate (₪/$)"]
+for row in edited_df.itertuples(index=False):
+    action = row.Action
+    units = row.Units
+    # We use getattr because column names with spaces/symbols cannot be accessed via dot notation
+    price = getattr(row, "Unit Price ($)")
+    date = row.Date
+    rate = getattr(row, "Rate (₪/$)")
 
     # --- AUTO-FILL LOGIC ---
     if pd.isna(rate) or rate <= 0:
@@ -353,9 +366,9 @@ st.markdown(
     '<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; color: #004085; text-align: right; font-family: sans-serif; margin-bottom: 15px; border: 1px solid #b8daff;">💡 <b>המלצת מערכת (Best Practice):</b> ודאו ש"סך יחידות פתוחות" תואם במדויק ליתרה המופיעה בחשבון הברוקר או הבנק שלכם.</div>',
     unsafe_allow_html=True)
 
-# Reset checkbox if ledger or ticker changes
-current_ledger_hash = hash(ticker_input +edited_df.fillna("").to_json(date_format="iso"))
-
+# Reset checkbox if ledger or ticker changes (create a hash using SHA-256)
+ledger_json = edited_df.fillna("").to_json(date_format="iso")
+current_ledger_hash = hashlib.sha256((ticker_input + ledger_json).encode('utf-8')).hexdigest()
 
 if 'ledger_hash' not in st.session_state:
     st.session_state['ledger_hash'] = current_ledger_hash
@@ -474,11 +487,23 @@ for y in years:
     gross_ils_b = new_units * future_price_y * interpolated_rate_y
     scenario_b_net.append(gross_ils_b - tax_b)
 
-# Find Breakeven
-breakeven_year = None
-for i in range(len(years)):
-    if scenario_a_net[i] > scenario_b_net[i]:
-        breakeven_year = years[i]
+# --- FIND CROSSOVER (BREAKEVEN) POINT ---
+crossover_year = None
+crossover_type = None  # "HOLD_WINS_LATER" or "STEP_UP_WINS_LATER"
+
+for i in range(1, len(years)):
+    prev_a, prev_b = scenario_a_net[i-1], scenario_b_net[i-1]
+    curr_a, curr_b = scenario_a_net[i], scenario_b_net[i]
+
+    # Crossover Type 1: Step-Up started higher, but HOLD overtook it
+    if prev_a <= prev_b and curr_a > curr_b:
+        crossover_year = years[i]
+        crossover_type = "HOLD_WINS_LATER"
+        break
+    # Crossover Type 2: HOLD started higher, but Step-Up overtook it
+    elif prev_a >= prev_b and curr_a < curr_b:
+        crossover_year = years[i]
+        crossover_type = "STEP_UP_WINS_LATER"
         break
 
 fig2 = go.Figure()
@@ -501,9 +526,9 @@ fig2.add_trace(go.Scatter(
     hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
-if breakeven_year:
-    fig2.add_vline(x=breakeven_year, line_width=2, line_dash="dash", line_color="black",
-                   annotation_text=f"Breakeven: Year {breakeven_year}", annotation_position="top left")
+if crossover_year:
+    fig2.add_vline(x=crossover_year, line_width=2, line_dash="dash", line_color="black",
+                   annotation_text=f"Breakeven: Year {crossover_year}", annotation_position="top left")
 
 fig2.update_layout(
     title=dict(text="Net Portfolio Value (₪) After Final Tax", x=0.05, xanchor='left'),
@@ -565,19 +590,19 @@ if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
         else:
              st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח.</div>', unsafe_allow_html=True)
 
-    elif breakeven_year:
-        # There is a crossover point!
-        if breakeven_year == 1:
-            st.markdown(f'<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>אזהרה:</b> תחת תחזית תשואה של {expected_return}%, חלופת ה-HOLD מנצחת באופן מיידי. הפעולה אינה כדאית.</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תמשכו את הכסף ב-<b>{breakeven_year - 1} השנים הקרובות</b>. החל משנה {breakeven_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
+    elif crossover_year:
+        # There is a crossover point! Let's analyze HOW they crossed.
+        if crossover_type == "HOLD_WINS_LATER":
+            st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תממשו את הנכס ב-<b>{crossover_year - 1} השנים הקרובות</b>. החל משנה {crossover_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
+        elif crossover_type == "STEP_UP_WINS_LATER":
+            st.markdown(f'<div dir="rtl" style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; color: #0c5460; text-align: right; border: 1px solid #bee5eb;"><b>השקעה לטווח ארוך (Delayed Gratification):</b> בטווח הקצר האסטרטגיה מפסידה (בגלל תשלום מס/עמלות היום), אך ככל ששער הדולר יטפס בעתיד, מגן המס החדש שיצרתם יצבור כוח. האסטרטגיה תהפוך לכדאית ותעקוף את ה-HOLD החל מ-<b>שנה {crossover_year}</b> והלאה.</div>', unsafe_allow_html=True)
 
     else:
-        # No crossover at all. One line is strictly above the other.
+        # No crossover at all. One line is strictly above the other for the entire horizon.
         if step_up_wins_end:
-            st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין. מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס.</div>', unsafe_allow_html=True)
+            st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין. מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס לכל אורך התקופה.</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;">על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD). תשלום המס / עמלות היום אינו משתלם כלכלית (או כדאי רק תחת שיקולי קיזוז חיצוניים).</div>', unsafe_allow_html=True)
+            st.markdown(f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><b>HOLD מנצח:</b> על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD). תשלום המס / עמלות היום אינו משתלם כלכלית לכל אורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
 
 # Actionable Disclaimer Box
 st.markdown("---")
