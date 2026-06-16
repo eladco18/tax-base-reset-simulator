@@ -170,14 +170,14 @@ def fetch_asset_data(ticker_symbol: str, fh_key: str, tg_key: str):
     if fh_key:
         try:
             return _finnhub_fetch(symbol, fh_key)
-        except Exception as e:
-            st.warning(f"⚠️ Finnhub error: {_safe_error_message(e, fh_key)}. Trying fallback...")
+        except Exception:
+            pass
 
     if tg_key:
         try:
             return _tiingo_fetch(symbol, tg_key)
-        except Exception as e:
-            st.error(f"🚨 Tiingo error: {_safe_error_message(e, tg_key)}")
+        except Exception:
+            pass
 
     return 0.0, "ERROR", False
 

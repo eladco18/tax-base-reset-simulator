@@ -129,7 +129,7 @@ with st.spinner("מאתחל נתוני שוק..."):
 
 # Prevent division by zero and phantom calculations if API fails
 if current_price <= 0 or asset_currency == "ERROR":
-    st.sidebar.markdown(
+    st.markdown(
         '<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; '
         'color: #721c24; text-align: right; border: 1px solid #f5c6cb; font-family: sans-serif; margin-bottom: 10px;">'
         f'🛑 <b>שגיאת נתוני שוק קריטית:</b> לא ניתן לאחזר מחיר עדכני עבור <b>{ticker_input}</b> '
@@ -281,13 +281,12 @@ edited_df = edited_df.sort_values(by=["Date", "Action_Rank"]).reset_index(drop=T
 open_lots = []
 validation_error = False
 
-for row in edited_df.itertuples(index=False):
-    action = row.Action
-    units = row.Units
-    # We use getattr because column names with spaces/symbols cannot be accessed via dot notation
-    price = getattr(row, "Unit Price ($)")
-    date = row.Date
-    rate = getattr(row, "Rate (₪/$)")
+for row in edited_df.to_dict('records'):
+    action = row["Action"]
+    units = row["Units"]
+    price = row["Unit Price ($)"]
+    date = row["Date"]
+    rate = row["Rate (₪/$)"]
 
     # --- AUTO-FILL LOGIC ---
     if pd.isna(rate) or rate <= 0:
