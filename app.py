@@ -105,16 +105,6 @@ if not re.match(r"^[A-Z0-9\-\.]+$", ticker_input):
     st.stop()
 
 # st.sidebar.markdown("---")
-st.sidebar.markdown("<h3 dir='rtl' style='text-align: right;'>💸 עלויות חיכוך</h3>", unsafe_allow_html=True)
-transaction_costs_usd = st.sidebar.number_input(
-    "עמלות קנייה ומכירה ($)",
-    min_value=0.0,
-    value=0.0,
-    step=1.0,
-    help="סך כל עמלות הברוקר עבור פעולות המכירה והקנייה המיידית (לדוגמה: $5 למכירה + $5 לקנייה = $10 סך הכל). סכום זה יופחת מקרן ההשקעה הזמינה.\u200F"
-)
-
-# st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 dir='rtl' style='text-align: right;'>🔮 תחזיות לעתיד</h3>", unsafe_allow_html=True)
 expected_return = st.sidebar.number_input("תשואה שנתית צפויה (%)", min_value=-100.0, max_value=100.0, value=5.0,
                                           step=0.5)
@@ -460,9 +450,9 @@ years = np.arange(1, investment_horizon + 1)
 scenario_a_net = []  # HOLD
 scenario_b_net = []  # Reset Tax Base Today
 
-# SCENARIO B INITIALIZATION (WITH FRICTION COSTS)
+# SCENARIO B INITIALIZATION (PURE TAX COMPARISON)
 net_ils_after_tax_today = total_ils_value - total_tax_today
-new_usd_base = (net_ils_after_tax_today / current_rate) - transaction_costs_usd
+new_usd_base = net_ils_after_tax_today / current_rate
 new_usd_base = max(0.0, new_usd_base)
 new_units = new_usd_base / current_price
 
@@ -591,7 +581,7 @@ if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
         if crossover_type == "HOLD_WINS_LATER":
             tradeoff_text = " (כמו גם אובדן מגן המס השקלי) " if is_tradeoff else " "
             st.markdown(
-                f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תממשו את הנכס ב-<b>{crossover_year - 1} השנים הקרובות</b>. החל משנה {crossover_year}, אובדן התשואה על מס/עמלות ששולמו היום{tradeoff_text}יעלה על חיסכון המס העתידי.</div>',
+                f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תממשו את הנכס ב-<b>{crossover_year - 1} השנים הקרובות</b>. החל משנה {crossover_year}, אובדן התשואה על המס ששולם היום{tradeoff_text}יעלה על חיסכון המס העתידי.</div>',
                 unsafe_allow_html=True)
         elif crossover_type == "STEP_UP_WINS_LATER":
             tradeoff_text = " (למרות הוויתור על מגן המס השקלי היום) " if is_tradeoff else " "
@@ -607,7 +597,7 @@ if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
                 f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין.{tradeoff_text}מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס לכל אורך התקופה.</div>',
                 unsafe_allow_html=True)
         else:
-            tradeoff_text = " הוויתור על מגן המס השקלי אינו משתלם. " if is_tradeoff else " תשלום המס / עמלות היום אינו משתלם כלכלית לכל אורך התקופה. "
+            tradeoff_text = " הוויתור על מגן המס השקלי אינו משתלם. " if is_tradeoff else " תשלום המס היום אינו משתלם כלכלית לכל אורך התקופה. "
             st.markdown(
                 f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><b>HOLD מנצח:</b> על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD).{tradeoff_text}</div>',
                 unsafe_allow_html=True)
@@ -617,7 +607,7 @@ st.markdown("---")
 disclaimer_items = [
     "⚠️ <b>הבהרה משפטית:</b> תוצאות הסימולציה מבוססות על מודל מתמטי והערכות עתידיות. המערכת נועדה למטרות מחקר, לימוד והדגמה בלבד, ואינה מהווה ייעוץ מס פרטני, ייעוץ פיננסי, או המלצה לביצוע פעולות בשוק ההון. חובה להתייעץ עם רואה חשבון או יועץ מס מוסמך טרם קבלת החלטות פיננסיות.",
     "💡 <b>נקודות קריטיות לתשומת לב לקראת ביצוע:</b> הסימולציה מציגה את השפעת מס רווח ההון על הקרן בלבד. ביצוע \"העלאת מס בסיס\" בפועל דורש שתי פעולות רצופות, ולכן חובה לוודא מול הברוקר:",
-    "<b>1. חישוב עמלות שמרני (Friction Costs):</b> בתיקים קטנים, עמלות קנייה ומכירה עלולות למחוק את רוב או כל חיסכון המס. הסימולטור מפחית את העמלות שהזנת מסך ההון הזמין להשקעה מחדש, אך למען פשטות המודל, הן <b>אינן</b> משוקללות באופן רטרואקטיבי לתוך בסיס המס ההיסטורי (Adjusted Cost Basis). חישוב פרטני אצל רואה חשבון עשוי להקטין את חבות המס שלך אף יותר מהמוצג.",
+    "<b>1. חישוב עמלות שמרני (Friction Costs):</b> למען פשטות המודל הפיננסי ויצירת השוואה טהורה בין חלופות המס, הסימולטור <b>אינו</b> לוקח בחשבון עמלות ברוקר (קנייה ומכירה) או פערי ציטוט בשוק (Bid-Ask Spread). בתיקים קטנים מאוד, עמלות אלו עלולות לנגוס בחלק מחיסכון המס, ולכן יש לשקלל אותן באופן עצמאי טרם ביצוע הפעולה.",
     "<b>2. סכנת המרה כפולה:</b> ודא שתמורת המכירה נכנסת לחשבון המט\"ח (USD) ו<b>שלא</b> מתבצעת המרה אוטומטית לשקלים, כדי למנוע עמלות חליפין ופערי שער (Spread) מיותרים.",
     "<b>3. פערי ציטוט בשוק (Bid-Ask Spread):</b> מעבר לעמלות הקנייה והמכירה של הברוקר, פעולה מהירה בשוק ההון כרוכה בעלות חיכוך מובנית. בעת פעולת ה\"איפוס\", אתה תיאלץ למכור את הנכס במחיר הקונה (Bid) הנמוך מעט, ומיד לקנות אותו במחיר המוכר (Ask) הגבוה מעט. בניירות ערך חסרי נזילות (סחירות נמוכה), פער זה מתרחב ועלול למחוק חלק מחיסכון המס.",
     "<b>4. סכנת \"עסקה מלאכותית\" (סעיף 86 לפקודה):</b> מכירה וקנייה מיידית של <i>אותו נייר ערך בדיוק</i> עלולה להיות מסווגת על ידי מס הכנסה כעסקה מלאכותית (Wash Sale), מה שעשוי לאיין את ההכרה באירוע המס. כדי להתמודד WITH סוגיה זו ולשמור על החשיפה לשוק, משקיעים רבים בוחרים לבצע את הרכישה החוזרת בקרן מחקה עוקבת של יצרן אחר (למשל, מכירת קרן SPY ורכישת קרן VOO או IVV באותו רגע), או לחלופין, להמתין מספר ימי מסחר לפני הרכישה החוזרת.",
