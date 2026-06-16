@@ -576,32 +576,41 @@ elif total_usd_profit_today <= 0:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- STAGE 2: FUTURE PROJECTIONS ANALYSIS (THE BREAKEVEN LOGIC) ---
-st.markdown("<h4 dir='rtl' style='text-align: right;'>🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)</h4>", unsafe_allow_html=True)
+st.markdown("<h4 dir='rtl' style='text-align: right;'>🔮 ניתוח כדאיות מבוסס עתיד (Future Projection Analysis)</h4>",
+            unsafe_allow_html=True)
 
 if len(scenario_b_net) > 0 and len(scenario_a_net) > 0:
     # Mathematical proof: who wins in the final year?
     step_up_wins_end = scenario_b_net[-1] > scenario_a_net[-1]
 
-    if total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0:
-        # Scenario 2 (Trade-off) specific text
-        if step_up_wins_end:
-             st.markdown('<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>שבירת המלכודת:</b> מנוע התחזיות קובע שעל אף שאתם שורפים מגן מס שקלי היום, תחזית העלייה של הדולר שהזנתם מנפחת את המגן הריאלי החדש בצורה שמפצה על כך. האסטרטגיה <b>מנצחת את חלופת ה-HOLD</b> לאורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
-        else:
-             st.markdown('<div dir="rtl" style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24; text-align: right; border: 1px solid #f5c6cb;"><b>השמדת ערך ודאית:</b> מנוע התחזיות מוכיח כי הוויתור על מגן המס השקלי היום לא משתלם. הגרף מראה שה-HOLD מנצח.</div>', unsafe_allow_html=True)
+    # Did we burn a shield? (Trade-off Scenario 2 condition)
+    is_tradeoff = (total_tax_today == 0 and total_burned_shield > 1.0 and total_usd_profit_today > 0)
 
-    elif crossover_year:
+    if crossover_year:
         # There is a crossover point! Let's analyze HOW they crossed.
         if crossover_type == "HOLD_WINS_LATER":
-            st.markdown(f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תממשו את הנכס ב-<b>{crossover_year - 1} השנים הקרובות</b>. החל משנה {crossover_year}, אובדן התשואה (הריבית דריבית) על מס/עמלות ששולמו היום יעלה על חיסכון המס העתידי.</div>', unsafe_allow_html=True)
+            tradeoff_text = " (כמו גם אובדן מגן המס השקלי) " if is_tradeoff else " "
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; color: #856404; text-align: right; border: 1px solid #ffeeba;"><b>חלון זמנים מוגבל (Time-Sensitive):</b> האסטרטגיה רווחית אך ורק אם תממשו את הנכס ב-<b>{crossover_year - 1} השנים הקרובות</b>. החל משנה {crossover_year}, אובדן התשואה על מס/עמלות ששולמו היום{tradeoff_text}יעלה על חיסכון המס העתידי.</div>',
+                unsafe_allow_html=True)
         elif crossover_type == "STEP_UP_WINS_LATER":
-            st.markdown(f'<div dir="rtl" style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; color: #0c5460; text-align: right; border: 1px solid #bee5eb;"><b>השקעה לטווח ארוך (Delayed Gratification):</b> בטווח הקצר האסטרטגיה מפסידה (בגלל תשלום מס/עמלות היום), אך ככל ששער הדולר יטפס בעתיד, מגן המס החדש שיצרתם יצבור כוח. האסטרטגיה תהפוך לכדאית ותעקוף את ה-HOLD החל מ-<b>שנה {crossover_year}</b> והלאה.</div>', unsafe_allow_html=True)
+            tradeoff_text = " (למרות הוויתור על מגן המס השקלי היום) " if is_tradeoff else " "
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; color: #0c5460; text-align: right; border: 1px solid #bee5eb;"><b>השקעה לטווח ארוך (Delayed Gratification):</b> בטווח הקצר האסטרטגיה מפסידה, אך ככל ששער הדולר יטפס בעתיד, מגן המס החדש שיצרתם יצבור כוח{tradeoff_text}ויעקוף את ה-HOLD החל מ-<b>שנה {crossover_year}</b> והלאה.</div>',
+                unsafe_allow_html=True)
 
     else:
         # No crossover at all. One line is strictly above the other for the entire horizon.
         if step_up_wins_end:
-            st.markdown(f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין. מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס לכל אורך התקופה.</div>', unsafe_allow_html=True)
+            tradeoff_text = " על אף ששרפתם מגן מס שקלי היום, " if is_tradeoff else " "
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724; text-align: right; border: 1px solid #c3e6cb;"><b>אסטרטגיה מנצחת:</b> על פני אופק של {investment_horizon} שנים, אסטרטגיית ה-Step-Up מנצחת לחלוטין.{tradeoff_text}מודל הצמיחה מראה יתרון מתמטי עקבי להעלאת הבסיס לכל אורך התקופה.</div>',
+                unsafe_allow_html=True)
         else:
-            st.markdown(f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><b>HOLD מנצח:</b> על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD). תשלום המס / עמלות היום אינו משתלם כלכלית לכל אורך תקופת ההשקעה.</div>', unsafe_allow_html=True)
+            tradeoff_text = " הוויתור על מגן המס השקלי אינו משתלם. " if is_tradeoff else " תשלום המס / עמלות היום אינו משתלם כלכלית לכל אורך התקופה. "
+            st.markdown(
+                f'<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><b>HOLD מנצח:</b> על פני טווח של {investment_horizon} שנים, מודל הצמיחה מראה יתרון מתמטי עקבי להחזקה פסיבית (HOLD).{tradeoff_text}</div>',
+                unsafe_allow_html=True)
 
 # Actionable Disclaimer Box
 st.markdown("---")
