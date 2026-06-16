@@ -497,30 +497,34 @@ for i in range(1, len(years)):
         crossover_type = "STEP_UP_WINS_LATER"
         break
 
+x_hover = [f"{int(y)} Yrs<br>USD/ILS: ₪{projected_rates[i]:.4f}" for i, y in enumerate(years)]
+
 fig2 = go.Figure()
 
 fig2.add_trace(go.Scatter(
-    x=years,
+    x=x_hover,
     y=scenario_a_net,
     mode='lines',
     name='HOLD',
     line=dict(color='#27ae60', width=3),
-    customdata=projected_rates,
-    hovertemplate="Projected USD/ILS: <b>₪%{customdata:.4f}</b><br>Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
+    hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
 fig2.add_trace(go.Scatter(
-    x=years,
+    x=x_hover,
     y=scenario_b_net,
     mode='lines',
     name='Tax Base Step-Up',
     line=dict(color='#c0392b', width=3),
-    customdata=projected_rates,
     hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
 if crossover_year:
-    fig2.add_vline(x=crossover_year, line_width=2, line_dash="dash", line_color="black",
+    # Find the exact string label for the crossover year to correctly plot the vline on a categorical axis
+    cross_idx = list(years).index(crossover_year)
+    cross_x_label = x_hover[cross_idx]
+
+    fig2.add_vline(x=cross_x_label, line_width=2, line_dash="dash", line_color="black",
                    annotation_text=f"Breakeven: Year {crossover_year}", annotation_position="top left")
 
 fig2.update_layout(
@@ -533,8 +537,9 @@ fig2.update_layout(
 )
 
 fig2.update_xaxes(
-    hoverformat=".0f",
-    ticksuffix=" Yrs"
+    tickmode='array',
+    tickvals=x_hover,
+    ticktext=[f"{int(y)} Yrs" for y in years]
 )
 
 st.plotly_chart(fig2, use_container_width=True)
