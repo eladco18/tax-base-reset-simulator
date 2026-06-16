@@ -447,8 +447,9 @@ st.markdown(
     unsafe_allow_html=True)
 
 years = np.arange(1, investment_horizon + 1)
-scenario_a_net = []  # HOLD
-scenario_b_net = []  # Reset Tax Base Today
+scenario_a_net = []   # HOLD
+scenario_b_net = []   # Reset Tax Base Today
+projected_rates = []  # Rate Per Year
 
 # SCENARIO B INITIALIZATION (PURE TAX COMPARISON)
 net_ils_after_tax_today = total_ils_value - total_tax_today
@@ -465,6 +466,7 @@ for y in years:
     # 2. Rate projection (Linear Interpolation)
     # The rate climbs gradually from current_rate to future_rate over the investment horizon
     interpolated_rate_y = current_rate + ((future_rate - current_rate) * (y / investment_horizon))
+    projected_rates.append(interpolated_rate_y)
 
     # Scenario A projection (HOLD)
     tax_a, _, _, _, _ = calculate_portfolio_tax(open_lots, future_price_y, interpolated_rate_y)
@@ -503,7 +505,8 @@ fig2.add_trace(go.Scatter(
     mode='lines',
     name='HOLD',
     line=dict(color='#27ae60', width=3),
-    hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
+    customdata=projected_rates,
+    hovertemplate="Projected USD/ILS: <b>₪%{customdata:.4f}</b><br>Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
 fig2.add_trace(go.Scatter(
@@ -512,6 +515,7 @@ fig2.add_trace(go.Scatter(
     mode='lines',
     name='Tax Base Step-Up',
     line=dict(color='#c0392b', width=3),
+    customdata=projected_rates,
     hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
@@ -534,6 +538,8 @@ fig2.update_xaxes(
 )
 
 st.plotly_chart(fig2, use_container_width=True)
+# Note explaining the linear rate progression
+st.markdown(f'<div dir="rtl" style="text-align: right; font-size: 0.85rem; color: gray; margin-top: -10px; margin-bottom: 20px;">* <b>מודל שער החליפין:</b> שער הדולר בגרף מוגדר כעולה (או יורד) בצורה הדרגתית וליניארית מנקודת הפתיחה היום (₪{current_rate:.4f}) ועד לשער היעד שהזנת (₪{future_rate:.4f}) בסוף התקופה ({investment_horizon} שנים). תוכלו לראות את השער הספציפי לכל שנה בריחוף מעל הגרף.</div>', unsafe_allow_html=True)
 
 # CFO Verdict
 st.markdown("<br><h3 dir='rtl' style='text-align: right;'>⚖️ פסק הדין האסטרטגי (CFO Verdict)</h3>",
@@ -607,7 +613,7 @@ st.markdown("---")
 disclaimer_items = [
     "⚠️ <b>הבהרה משפטית:</b> תוצאות הסימולציה מבוססות על מודל מתמטי והערכות עתידיות. המערכת נועדה למטרות מחקר, לימוד והדגמה בלבד, ואינה מהווה ייעוץ מס פרטני, ייעוץ פיננסי, או המלצה לביצוע פעולות בשוק ההון. חובה להתייעץ עם רואה חשבון או יועץ מס מוסמך טרם קבלת החלטות פיננסיות.",
     "💡 <b>נקודות קריטיות לתשומת לב לקראת ביצוע:</b> הסימולציה מציגה את השפעת מס רווח ההון על הקרן בלבד. ביצוע \"העלאת מס בסיס\" בפועל דורש שתי פעולות רצופות, ולכן חובה לוודא מול הברוקר:",
-    "<b>1. חישוב עמלות שמרני (Friction Costs):</b> למען פשטות המודל הפיננסי ויצירת השוואה טהורה בין חלופות המס, הסימולטור <b>אינו</b> לוקח בחשבון עמלות ברוקר (קנייה ומכירה) או פערי ציטוט בשוק (Bid-Ask Spread). בתיקים קטנים מאוד, עמלות אלו עלולות לנגוס בחלק מחיסכון המס, ולכן יש לשקלל אותן באופן עצמאי טרם ביצוע הפעולה.",
+    "<b>1. חישוב עמלות שמרני (Friction Costs):</b> למען פשטות המודל הפיננסי ויצירת השוואה טהורה בין חלופות המס, הסימולטור <b>אינו</b> לוקח בחשבון עמלות ברוקר (קנייה ומכירה). בתיקים קטנים מאוד, עמלות אלו עלולות לנגוס בחלק מחיסכון המס, ולכן יש לשקלל אותן באופן עצמאי טרם ביצוע הפעולה.",
     "<b>2. סכנת המרה כפולה:</b> ודא שתמורת המכירה נכנסת לחשבון המט\"ח (USD) ו<b>שלא</b> מתבצעת המרה אוטומטית לשקלים, כדי למנוע עמלות חליפין ופערי שער (Spread) מיותרים.",
     "<b>3. פערי ציטוט בשוק (Bid-Ask Spread):</b> מעבר לעמלות הקנייה והמכירה של הברוקר, פעולה מהירה בשוק ההון כרוכה בעלות חיכוך מובנית. בעת פעולת ה\"איפוס\", אתה תיאלץ למכור את הנכס במחיר הקונה (Bid) הנמוך מעט, ומיד לקנות אותו במחיר המוכר (Ask) הגבוה מעט. בניירות ערך חסרי נזילות (סחירות נמוכה), פער זה מתרחב ועלול למחוק חלק מחיסכון המס.",
     "<b>4. סכנת \"עסקה מלאכותית\" (סעיף 86 לפקודה):</b> מכירה וקנייה מיידית של <i>אותו נייר ערך בדיוק</i> עלולה להיות מסווגת על ידי מס הכנסה כעסקה מלאכותית (Wash Sale), מה שעשוי לאיין את ההכרה באירוע המס. כדי להתמודד WITH סוגיה זו ולשמור על החשיפה לשוק, משקיעים רבים בוחרים לבצע את הרכישה החוזרת בקרן מחקה עוקבת של יצרן אחר (למשל, מכירת קרן SPY ורכישת קרן VOO או IVV באותו רגע), או לחלופין, להמתין מספר ימי מסחר לפני הרכישה החוזרת.",
