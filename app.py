@@ -497,36 +497,25 @@ for i in range(1, len(years)):
         crossover_type = "STEP_UP_WINS_LATER"
         break
 
-x_hover = [f"{int(y)} Yrs<br>USD/ILS: ₪{projected_rates[i]:.4f}" for i, y in enumerate(years)]
-
 fig2 = go.Figure()
 
 fig2.add_trace(go.Scatter(
     x=years,
     y=scenario_a_net,
     mode='lines',
-    name='Projected USD/ILS',
-    line=dict(color='rgba(0,0,0,0)', width=0), # צבע שקוף לחלוטין!
-    customdata=projected_rates,
-    hovertemplate="₪%{customdata:.4f}<extra></extra>",
-    showlegend=False
-))
-
-fig2.add_trace(go.Scatter(
-    x=x_hover,
-    y=scenario_a_net,
-    mode='lines',
     name='HOLD',
     line=dict(color='#27ae60', width=3),
+    customdata=projected_rates,
     hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
 fig2.add_trace(go.Scatter(
-    x=x_hover,
+    x=years,
     y=scenario_b_net,
     mode='lines',
     name='Tax Base Step-Up',
     line=dict(color='#c0392b', width=3),
+    customdata=projected_rates,
     hovertemplate="Net Portfolio Value: ₪%{y:,.2f}<extra></extra>"
 ))
 
@@ -544,13 +533,11 @@ fig2.update_layout(
 )
 
 fig2.update_xaxes(
-    tickmode='array',
-    tickvals=x_hover,
-    ticktext=[f"{int(y)} Yrs" for y in years]
+    hoverformat=".0f",
+    ticksuffix=" Yrs"
 )
 
 st.plotly_chart(fig2, use_container_width=True)
-
 # Note explaining the linear rate progression
 st.markdown(f'<div dir="rtl" style="text-align: right; font-size: 0.85rem; color: gray; margin-top: -10px; margin-bottom: 20px;">* <b>מודל שער החליפין:</b> שער הדולר בגרף מוגדר כעולה (או יורד) בצורה הדרגתית וליניארית מנקודת הפתיחה היום (₪{current_rate:.4f}) ועד לשער היעד שהזנת (₪{future_rate:.4f}) בסוף התקופה ({investment_horizon} שנים). תוכלו לראות את השער הספציפי לכל שנה בריחוף מעל הגרף.</div>', unsafe_allow_html=True)
 
