@@ -8,12 +8,14 @@ Israeli tax law provides a "nominal protection" mechanism: capital gains tax is 
 However, executing this strategy involves friction costs (commissions, bid-ask spreads) and impacts compound interest. This simulator acts as a robust Tax Engine and CFO dashboard to calculate the exact breakeven point and determine if the strategy is mathematically sound for your portfolio.
 
 ## ✨ Key Features
-* **Advanced Tax Engine:** Calculates Section 91(b) tax liability per Tax Lot based on the mandatory FIFO (First-In-First-Out) algorithm.
-* **The Moses Ruling Filter:** Automatically identifies and zeros out nominal currency losses that are not recognized for tax offset purposes.
-* **Real-Time Data Pipeline:** * Fetches historical USD/ILS exchange rates directly from the Bank of Israel (SDMX-JSON API).
-  * Pulls real-time asset prices and dividend status using **Finnhub**, with an automatic failover redundancy mechanism routing to **Tiingo** if rate limits are hit.
-* **Breakeven Analysis:** Projects the Net ILS portfolio value over time using compound interest calculations, visualizing the exact year the tax savings outweigh the lost capital from friction costs.
-* **Responsive UI:** Built with Streamlit and Plotly for a modern, interactive, and seamless user experience.
+* **Advanced Tax Engine:** Evaluates Section 91(b) tax liabilities per individual Tax Lot using a highly stable, chronological First-In-First-Out (FIFO) queueing algorithm with automated splitting logic.
+* **The Moses Ruling Filter:** Implements an automated double-loss filter to isolate and nullify nominal currency losses that are legally unrecognized for tax offset purposes under current Israeli regulations.
+* **Real-Time Data Pipeline & Redundancy:** Integrates directly with the Bank of Israel's official SDMX-JSON API for historical FX data, backed by a resilient, multi-tier market asset pipeline using Finnhub with automated failover routing to Tiingo.
+* **Cryptographic State Management:** Protects UI data integrity against reactive layout desynchronization by generating a continuous `SHA-256` hash of ledger and ticker inputs, programmatically locking the analysis until compliance checks are re-verified.
+* **Dynamic Liquidation & Breakeven Projections:** Replaces simplified static interest formulas with a Full Liquidation Simulation, charting net portfolio values over time by dynamically re-running the core tax engine under linear interpolation models for future asset growth and FX shifts.
+* **The CFO Verdict Matrix:** A rule-based strategic decision engine that classifies complex portfolio states into five high-conviction financial categories (e.g., *The Golden Point*, *Step-Down Trap*, *Unnecessary Tax Advancement*) to deliver contextual, actionable insights.
+* **Strategic Report Export:** Native document compilation capabilities allowing users to instantly download a comprehensive, standalone investment strategy manual (PDF) directly from the application interface.
+* **Enterprise UI/UX:** Designed with a customized Right-to-Left (RTL) Hebrew presentation layer, utilizing headless mathematical modules combined with fully interactive dynamic vector plotting via Plotly.
 
 ## 🛠️ Tech Stack
 * **Language:** Python 3.9+
