@@ -566,7 +566,7 @@ elif total_tax_today > 0 and total_usd_profit_today > 0:
 
 elif total_usd_profit_today <= 0:
     st.markdown(
-        '<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><h4 style="margin-top: 0;">📉 תרחיש 4/5: השמדת ערך או אשליית מטבע</h4>הנכס נמצא בהפסד דולרי. ביצוע איפוס עכשיו מהווה הורדת בסיס (Step-Down). אסטרטגיה זו כדאית אך ורק במקרה של "מכירה רעיונית" שבה מנצלים את ההפסד המוכר לקיזוז מיידי מול נכסים מורווחים אחרים בתיק.</div>',
+        '<div dir="rtl" style="background-color: #e2e3e5; padding: 15px; border-radius: 5px; color: #383d41; text-align: right; border: 1px solid #d6d8db;"><h4 style="margin-top: 0;">📉 תרחיש 4/5: השמדת ערך או מלכודת הרווח האינפלציוני</h4>הנכס נמצא בהפסד דולרי. ביצוע איפוס עכשיו מהווה הורדת בסיס (Step-Down). אסטרטגיה זו כדאית אך ורק במקרה של "מכירה רעיונית" שבה מנצלים את ההפסד המוכר לקיזוז מיידי מול נכסים מורווחים אחרים בתיק.</div>',
         unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)

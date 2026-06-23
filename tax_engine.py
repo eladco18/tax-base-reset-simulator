@@ -40,7 +40,7 @@ def calculate_portfolio_tax(lots: list, current_price: float, current_rate: floa
             # The entire nominal loss is unrecognized. Convert to lost cash tax shield.
             burned_shield_cash = abs(nominal_ils_profit) * tax_rate
 
-        # Scenario D: Phantom Profit (USD Loss, ILS Profit)
+        # Scenario D: Phantom Nominal Profit (USD Loss, ILS Profit)
         elif usd_profit < 0 < nominal_ils_profit:
             # Legal Status: No real profit -> Tax is 0.
             # No nominal loss -> Recognized loss is 0.
