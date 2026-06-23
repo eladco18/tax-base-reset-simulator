@@ -628,6 +628,7 @@ if pays_dividend:
     )
 
 inner_html = "<br><br>".join(disclaimer_items)
+st.markdown("<br><h2 dir='rtl' style='text-align: right;'>6. אזהרות וכללי ברזל לביצוע</h2>", unsafe_allow_html=True)
 rtl_disclaimer_html = f'<div dir="rtl" style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; border: 1px solid #b8daff; color: #004085; text-align: right; font-family: sans-serif; line-height: 1.6;">{inner_html}</div>'
 
 st.markdown(rtl_disclaimer_html, unsafe_allow_html=True)
